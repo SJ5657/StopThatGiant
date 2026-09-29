@@ -174,6 +174,7 @@ public class TankAI : MonoBehaviour
         if (IsDead) return;
         IsDead = true;
         enabled = false;
+        ScoreManager.Add(ScoreManager.Instance ? ScoreManager.Instance.tankPoints : 500, "TANK");
         CombatFX.Explosion(transform.position + Vector3.up * 3f, 16f);
         CombatFX.Explosion(transform.position + Vector3.up * 1f, 10f);
         Vector3 sc = transform.localScale;

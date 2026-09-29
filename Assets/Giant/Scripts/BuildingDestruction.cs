@@ -1,24 +1,28 @@
 using UnityEngine;
 
-// 건물을 '깨진 유리' 파편으로 부수는 매니저.
+// 건물을 불규칙한 육면체 잔해로 부수는 매니저.
 // 물리엔진(Rigidbody) 없이 간단한 탄도 계산으로 움직이고, GPU 인스턴싱으로 한꺼번에 그림 (GameObject 생성 없음).
+// 파편은 땅에 닿는 순간 땅속으로 가라앉으며 사라진다.
 public class BuildingDestruction : MonoBehaviour
 {
     public static BuildingDestruction Instance { get; private set; }
 
     [Header("파편")]
-    public Material shardMaterial;           // City/GlassShard (GPU Instancing 켜짐)
+    public Material shardMaterial;           // GlassShard.mat (불투명 설정, GPU Instancing 켜짐)
     public int maxShards = 8000;
-    public int shardVariants = 8;             // 서로 다른 모양 개수
-    public int minShardsPerBuilding = 30;
-    public int maxShardsPerBuilding = 70;
-    public Vector2 shardSizeRange = new Vector2(7f, 20f);
+    public int shardVariants = 12;            // 서로 다른 모양 개수
+    public int minShardsPerBuilding = 6;
+    public int maxShardsPerBuilding = 14;
+    public Vector2 shardSizeRange = new Vector2(5f, 14f);
     public float lifetime = 6f;
     public float gravity = 30f;
     public float groundY = 0.3f;
-    public float pushForce = 1.0f;
+    [Tooltip("거인 이동 방향으로 밀리는 정도")] public float pushForce = 0.3f;
+    [Tooltip("부서진 지점에서 옆으로 퍼지는 속도 (최소, 최대)")] public Vector2 spreadSpeed = new Vector2(1.5f, 5f);
     public float upForce = 22f;
-    [Range(0, 1)] public float colorTintFromBuilding = 0.35f; // 건물 색 반영 비율
+    [Tooltip("땅에 닿은 뒤 땅속으로 흡수되어 사라지는 데 걸리는 시간(초)")] public float sinkTime = 0.45f;
+    [Tooltip("파편 기본 색 (불투명 어두운 회색)")] public Color shardColor = new Color(0.30f, 0.30f, 0.32f);
+    [Range(0, 1)] public float colorTintFromBuilding = 0f; // 건물 색 반영 비율
 
     [Header("먼지")]
     public bool dust = true;
@@ -34,7 +38,7 @@ public class BuildingDestruction : MonoBehaviour
         public float spin, dieAt, life;
         public Vector4 color;
         public int variant;
-        public bool resting;
+        public bool sinking;
     }
     Shard[] shards;
     int count;              // 활성 파편 수 (0..count-1)
@@ -58,7 +62,7 @@ public class BuildingDestruction : MonoBehaviour
         batchN = new int[shardVariants];
         for (int i = 0; i < shardVariants; i++)
         {
-            meshes[i] = MakeShardMesh(i * 7919 + 13);
+            meshes[i] = MakeBlockMesh(i, i * 7919 + 13);
             batchM[i] = new Matrix4x4[1023];
             batchC[i] = new Vector4[1023];
         }
@@ -66,28 +70,88 @@ public class BuildingDestruction : MonoBehaviour
         if (dust && dustMaterial) dustPs = CreateDust();
     }
 
-    // 불규칙한 얇은 사면체 = 깨진 유리 조각. 면마다 정점을 분리하고 버텍스 컬러에 무게중심 좌표를 넣어 모서리 윤곽선 표현
-    static Mesh MakeShardMesh(int seed)
+    // 육면체 면 (꼭짓점 인덱스, 바깥에서 봤을 때 순서)
+    //   꼭짓점 번호: bit0 = x(+), bit1 = y(+), bit2 = z(+)
+    static readonly int[,] BoxQuads =
+    {
+        { 0, 2, 3, 1 }, // -z
+        { 4, 5, 7, 6 }, // +z
+        { 0, 4, 6, 2 }, // -x
+        { 1, 3, 7, 5 }, // +x
+        { 0, 1, 5, 4 }, // -y
+        { 2, 6, 7, 3 }  // +y
+    };
+
+    // 불규칙한 육면체: 모양 종류(정육면체형/판/기둥/쐐기/비틀린 블록)마다 비율을 다르게 하고,
+    // 8개 꼭짓점을 제각각 흔들어 같은 모양이 없게 만든다.
+    // 셰이더 윤곽선은 면의 대각선에는 그리지 않도록 버텍스 컬러를 설정 (사각형 테두리만 보임).
+    static Mesh MakeBlockMesh(int variant, int seed)
     {
         var r = new System.Random(seed);
         float R(float a, float b) => a + (float)r.NextDouble() * (b - a);
-        // 길쭉하고 뾰족한 삼각형
-        Vector3 a = new Vector3(R(-0.5f, -0.2f), R(-0.5f, -0.3f), 0);
-        Vector3 b = new Vector3(R(0.2f, 0.5f), R(-0.45f, -0.1f), 0);
-        Vector3 c = new Vector3(R(-0.25f, 0.25f), R(0.4f, 0.75f), 0);
-        Vector3 d = (a + b + c) / 3f + new Vector3(R(-0.1f, 0.1f), R(-0.1f, 0.1f), R(0.08f, 0.16f));
-        Vector3 center = (a + b + c + d) / 4f;
-        a -= center; b -= center; c -= center; d -= center;
 
-        var v = new Vector3[12]; var col = new Color[12]; var tri = new int[12];
-        Vector3[][] faces = { new[] { a, c, b }, new[] { a, b, d }, new[] { b, c, d }, new[] { c, a, d } };
-        Color[] bary = { new Color(1, 0, 0), new Color(0, 1, 0), new Color(0, 0, 1) };
-        for (int f = 0; f < 4; f++)
-            for (int k = 0; k < 3; k++) { v[f * 3 + k] = faces[f][k]; col[f * 3 + k] = bary[k]; tri[f * 3 + k] = f * 3 + k; }
-        var m = new Mesh { name = "GlassShard" + seed };
+        int kind = variant % 5;
+        Vector3 size;
+        switch (kind)
+        {
+            case 0:  size = new Vector3(R(0.85f, 1.1f), R(0.8f, 1.05f), R(0.85f, 1.1f)); break;  // 뭉툭한 블록
+            case 1:  size = new Vector3(R(1.0f, 1.3f), R(0.3f, 0.45f), R(0.8f, 1.1f)); break;   // 납작한 판 (벽·바닥)
+            case 2:  size = new Vector3(R(0.4f, 0.55f), R(1.2f, 1.5f), R(0.45f, 0.6f)); break;  // 기둥·보
+            case 3:  size = new Vector3(R(0.9f, 1.15f), R(0.6f, 0.85f), R(0.7f, 0.95f)); break; // 쐐기 (아래 참고)
+            default: size = new Vector3(R(0.8f, 1.05f), R(0.55f, 0.8f), R(0.9f, 1.2f)); break;  // 비틀린 블록
+        }
+
+        var p = new Vector3[8];
+        for (int i = 0; i < 8; i++)
+        {
+            Vector3 s = new Vector3((i & 1) != 0 ? 0.5f : -0.5f, (i & 2) != 0 ? 0.5f : -0.5f, (i & 4) != 0 ? 0.5f : -0.5f);
+            Vector3 q = Vector3.Scale(s, size);
+            // 꼭짓점마다 제각각 흔들기 → 모서리가 반듯하지 않은 깨진 덩어리
+            float j = 0.14f;
+            q += new Vector3(R(-j, j) * size.x, R(-j, j) * size.y, R(-j, j) * size.z);
+            p[i] = q;
+        }
+
+        if (kind == 3)
+        {
+            // 쐐기: 윗면 한쪽을 좁혀 비스듬히 부서진 모양
+            float taper = R(0.25f, 0.55f);
+            for (int i = 0; i < 8; i++) if ((i & 2) != 0 && (i & 1) != 0) p[i].x -= size.x * taper;
+        }
+        else if (kind == 4)
+        {
+            // 비틀린 블록: 윗면을 옆으로 밀고 살짝 회전
+            Vector3 shear = new Vector3(R(-0.25f, 0.25f), 0, R(-0.25f, 0.25f));
+            Quaternion twist = Quaternion.Euler(0, R(-20f, 20f), 0);
+            for (int i = 0; i < 8; i++) if ((i & 2) != 0) p[i] = twist * p[i] + shear;
+        }
+
+        Vector3 center = Vector3.zero;
+        foreach (var q in p) center += q;
+        center /= 8f;
+
+        // 면마다 삼각형 2개, 정점 분리 (각진 음영)
+        var v = new Vector3[36]; var col = new Color[36]; var tri = new int[36];
+        // 대각선(P-R)에는 윤곽선이 생기지 않는 무게중심 컬러
+        Color cP = new Color(1, 1, 0), cQ = new Color(1, 0, 0), cR = new Color(1, 0, 1);
+        int n = 0;
+        for (int f = 0; f < 6; f++)
+        {
+            int a = BoxQuads[f, 0], b = BoxQuads[f, 1], c = BoxQuads[f, 2], d = BoxQuads[f, 3];
+            // 삼각형1: a(P) b(Q) c(R), 삼각형2: c(P) d(Q) a(R)  → 대각선 a-c 숨김
+            v[n] = p[a] - center; col[n++] = cP;
+            v[n] = p[b] - center; col[n++] = cQ;
+            v[n] = p[c] - center; col[n++] = cR;
+            v[n] = p[c] - center; col[n++] = cP;
+            v[n] = p[d] - center; col[n++] = cQ;
+            v[n] = p[a] - center; col[n++] = cR;
+        }
+        for (int i = 0; i < 36; i++) tri[i] = i;
+
+        var m = new Mesh { name = "RubbleBlock" + variant };
         m.vertices = v; m.colors = col; m.triangles = tri;
         m.RecalculateNormals(); m.RecalculateBounds();
-        m.bounds = new Bounds(Vector3.zero, Vector3.one * 2f);
+        m.bounds = new Bounds(Vector3.zero, Vector3.one * 2.5f);
         return m;
     }
 
@@ -112,7 +176,11 @@ public class BuildingDestruction : MonoBehaviour
         SpawnShards(b.transform, hitPoint, push);
         b.SetActive(false);
         Destroy(b, 0.1f);
-        if (countIt) DestroyedCount++;
+        if (countIt)
+        {
+            DestroyedCount++;
+            ScoreManager.Add(ScoreManager.Instance ? ScoreManager.Instance.buildingPoints : 100);
+        }
         if (GiantCamera.Instance) GiantCamera.Instance.Shake(0.25f);
     }
 
@@ -127,8 +195,7 @@ public class BuildingDestruction : MonoBehaviour
             srcR.GetPropertyBlock(readMpb);
             baseCol = readMpb.isEmpty ? srcR.sharedMaterial.GetColor(ColorId) : (Color)readMpb.GetVector(ColorId);
         }
-        Color glass = new Color(0.82f, 0.92f, 1f);
-        Color tint = Color.Lerp(glass, baseCol, colorTintFromBuilding);
+        Color tint = Color.Lerp(shardColor, baseCol, colorTintFromBuilding);
 
         float volume = size.x * size.y * size.z;
         int n = Mathf.Max(3, Mathf.RoundToInt(Mathf.Clamp(Mathf.RoundToInt(volume / 250f), minShardsPerBuilding, maxShardsPerBuilding) * shardMul));
@@ -140,20 +207,22 @@ public class BuildingDestruction : MonoBehaviour
             ref Shard s = ref shards[idx];
             s.pos = c + Vector3.Scale(size, new Vector3(Random.Range(-0.5f, 0.5f), Random.Range(-0.45f, 0.5f), Random.Range(-0.5f, 0.5f)));
             float sz = Mathf.Clamp(minDim * Random.Range(0.3f, 0.7f), shardSizeRange.x, shardSizeRange.y);
-            s.scale = new Vector3(sz * Random.Range(0.7f, 1.3f), sz * Random.Range(0.8f, 1.6f), sz);
+            // 축마다 비율을 따로 줘서 같은 메시라도 모양이 달라 보이게
+            s.scale = new Vector3(sz * Random.Range(0.75f, 1.25f), sz * Random.Range(0.75f, 1.25f), sz * Random.Range(0.75f, 1.25f));
             s.rot = Random.rotation;
             s.spinAxis = Random.onUnitSphere;
-            s.spin = Random.Range(180f, 720f);
+            // 큰 덩어리일수록 천천히 회전 (무게감)
+            s.spin = Random.Range(90f, 360f) * Mathf.Clamp(12f / sz, 0.35f, 1.2f);
             Vector3 away = s.pos - hitPoint; away.y = 0;
             float heightFactor = Mathf.Clamp01((s.pos.y - c.y) / Mathf.Max(size.y, 0.01f) + 0.5f);
-            s.vel = away.normalized * Random.Range(4f, 16f) + push * pushForce * Random.Range(0.3f, 1f)
+            s.vel = away.normalized * Random.Range(spreadSpeed.x, spreadSpeed.y) + push * pushForce * Random.Range(0.3f, 1f)
                     + Vector3.up * upForce * Random.Range(0.3f, 1f) * (0.4f + heightFactor);
             s.life = lifetime * Random.Range(0.8f, 1.2f);
             s.dieAt = Time.time + s.life;
-            float g = Random.Range(0.85f, 1.1f);
+            float g = Random.Range(0.8f, 1.15f); // 조각마다 명암 살짝 다르게
             s.color = new Vector4(tint.r * g, tint.g * g, tint.b * g, 1);
             s.variant = Random.Range(0, shardVariants);
-            s.resting = false;
+            s.sinking = false;
         }
 
         if (dustPs) EmitDust(c, size);
@@ -202,6 +271,7 @@ public class BuildingDestruction : MonoBehaviour
     {
         float dt = Time.deltaTime, now = Time.time;
         for (int v = 0; v < shardVariants; v++) batchN[v] = 0;
+        float sinkDur = Mathf.Max(0.05f, sinkTime);
 
         for (int i = 0; i < count; i++)
         {
@@ -217,21 +287,32 @@ public class BuildingDestruction : MonoBehaviour
                 continue;
             }
 
-            if (!s.resting)
+            float shrink;
+            if (!s.sinking)
             {
                 s.vel.y -= gravity * dt;
                 s.pos += s.vel * dt;
                 s.rot = Quaternion.AngleAxis(s.spin * dt, s.spinAxis) * s.rot;
-                float floor = groundY + s.scale.z * 0.15f;
+                float floor = groundY + Mathf.Min(s.scale.x, Mathf.Min(s.scale.y, s.scale.z)) * 0.35f;
                 if (s.pos.y <= floor)
                 {
+                    // 땅에 닿는 순간 흡수 시작: 튕기지 않고 가라앉으며 사라짐
                     s.pos.y = floor;
-                    if (Mathf.Abs(s.vel.y) < 4f) { s.resting = true; s.vel = Vector3.zero; }
-                    else { s.vel.y = -s.vel.y * 0.25f; s.vel.x *= 0.5f; s.vel.z *= 0.5f; s.spin *= 0.4f; }
+                    s.sinking = true;
+                    s.dieAt = now + sinkDur;
+                    left = sinkDur;
                 }
+                shrink = left < 1f ? left : 1f;
+            }
+            else
+            {
+                // 크기만큼 땅속으로 내려가면서 점점 작아짐
+                float maxDim = Mathf.Max(s.scale.x, Mathf.Max(s.scale.y, s.scale.z));
+                s.pos.y -= maxDim * 1.1f / sinkDur * dt;
+                shrink = Mathf.Clamp01(left / sinkDur);
+                shrink = shrink * (2f - shrink); // 처음엔 천천히, 끝에 빠르게 줄어듦
             }
 
-            float shrink = left < 1f ? left : 1f;
             int vi = s.variant;
             int bn = batchN[vi];
             batchM[vi][bn] = Matrix4x4.TRS(s.pos, s.rot, s.scale * shrink);

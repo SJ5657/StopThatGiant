@@ -90,6 +90,7 @@ public class HeliAI : MonoBehaviour
     {
         if (IsDead) return;
         IsDead = true;
+        ScoreManager.Add(ScoreManager.Instance ? ScoreManager.Instance.heliPoints : 800, "HELICOPTER");
         CombatFX.Explosion(transform.position, 24f);
         CombatFX.Explosion(transform.position + Random.insideUnitSphere * 6f, 14f);
         foreach (var r in GetComponentsInChildren<Renderer>())

@@ -152,6 +152,7 @@ public class JetAI : MonoBehaviour
     {
         if (IsDead) return;
         IsDead = true;
+        ScoreManager.Add(ScoreManager.Instance ? ScoreManager.Instance.jetPoints : 1500, "FIGHTER JET");
         // 아직 투하 안 한 폭탄의 경고 표시 제거
         if (markers != null) for (int i = nextTarget; i < markers.Length; i++) if (markers[i]) Destroy(markers[i].gameObject);
         CombatFX.Explosion(transform.position, 26f);

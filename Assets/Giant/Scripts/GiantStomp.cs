@@ -21,6 +21,14 @@ public class GiantStomp : MonoBehaviour
         controller = GetComponent<GiantController>();
         if (buildingMask == 0) buildingMask = LayerMask.GetMask("Building");
         if (militaryMask == 0) militaryMask = LayerMask.GetMask("Military");
+        Rebind();
+    }
+
+    // 모델이 바뀌면(성별 선택) 애니메이터와 뼈 다시 찾기
+    public void Rebind()
+    {
+        anim = GetComponentInChildren<Animator>();
+        if (!anim) return;
         lFoot = anim.GetBoneTransform(HumanBodyBones.LeftFoot);
         rFoot = anim.GetBoneTransform(HumanBodyBones.RightFoot);
         lToe = anim.GetBoneTransform(HumanBodyBones.LeftToes);
@@ -31,6 +39,7 @@ public class GiantStomp : MonoBehaviour
 
     void LateUpdate() // 애니메이션 적용 후 뼈 위치 기준
     {
+        if (GameStartMenu.InMenu || !anim) return;
         float s = anim.transform.lossyScale.y;
         Vector3 push = controller ? controller.Velocity : transform.forward;
         Check(lFoot, footRadius * s, push); Check(rFoot, footRadius * s, push);

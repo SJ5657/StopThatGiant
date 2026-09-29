@@ -62,14 +62,11 @@ public class MilitarySpawner : MonoBehaviour
         helis.RemoveAll(h => !h || h.IsDead);
         jets.RemoveAll(j => !j || j.IsDead);
         int wj = WantedJets;
-        if (wj > lastWantedJ) { ShowBanner(lastWantedJ == 0 ? "WARNING: FIGHTER JETS INCOMING!" : "MORE JETS INCOMING!"); lastWantedJ = wj; }
+        if (wj > lastWantedJ) lastWantedJ = wj;
 
         int wt = WantedTanks, wh = WantedHelis;
         if (wt > lastWantedT || wh > lastWantedH)
         {
-            bool first = lastWantedT == 0 && lastWantedH == 0;
-            ShowBanner(first ? "WARNING: THE ARMY HAS ARRIVED!" :
-                       wh > lastWantedH && lastWantedH == 0 ? "WARNING: HELICOPTERS INCOMING!" : "REINFORCEMENTS INCOMING!");
             lastWantedT = wt; lastWantedH = wh;
         }
 
@@ -79,7 +76,8 @@ public class MilitarySpawner : MonoBehaviour
         else if (jets.Count < wj) { SpawnJet(g); nextSpawn = Time.time + spawnInterval * 2f; }
     }
 
-    public void ShowBanner(string text) { banner = text; bannerUntil = Time.time + 3f; }
+    [Tooltip("화면 중앙 경고 문구(폭격 경고 등) 표시 여부")] public bool showBanners = false;
+    public void ShowBanner(string text) { if (!showBanners) return; banner = text; bannerUntil = Time.time + 3f; }
 
     void SpawnTank(GiantHealth g)
     {
@@ -138,21 +136,15 @@ public class MilitarySpawner : MonoBehaviour
 
     void OnGUI()
     {
-        var style = new GUIStyle(GUI.skin.label) { fontStyle = FontStyle.Bold, fontSize = 14 };
-        GUI.color = Color.black;
-        string info = $"DESTROYED: {Destroyed}    TANKS: {tanks.Count}    HELIS: {helis.Count}    JETS: {jets.Count}";
-        GUI.Label(new Rect(21, 69, 600, 24), info, style);
-        GUI.color = Color.white;
-        GUI.Label(new Rect(20, 68, 600, 24), info, style);
-
+        if (GameStartMenu.InMenu) return; // 시작 메뉴 중에는 HUD 숨김
         if (Time.time < bannerUntil && !string.IsNullOrEmpty(banner))
         {
             var big = new GUIStyle(GUI.skin.label) { fontSize = 30, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
             float blink = Mathf.PingPong(Time.time * 3f, 1f);
             GUI.color = new Color(0, 0, 0, 0.8f);
-            GUI.Label(new Rect(2, Screen.height * 0.18f + 2, Screen.width, 50), banner, big);
+            GUI.Label(new Rect(2, Screen.height * 0.22f + 2, Screen.width, 50), banner, big);
             GUI.color = Color.Lerp(new Color(1f, 0.25f, 0.2f), new Color(1f, 0.85f, 0.3f), blink);
-            GUI.Label(new Rect(0, Screen.height * 0.18f, Screen.width, 50), banner, big);
+            GUI.Label(new Rect(0, Screen.height * 0.22f, Screen.width, 50), banner, big);
             GUI.color = Color.white;
         }
     }

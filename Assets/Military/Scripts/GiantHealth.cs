@@ -6,8 +6,12 @@ public class GiantHealth : MonoBehaviour
 {
     public static GiantHealth Instance { get; private set; }
     public float maxHP = 2000f;
+    [Tooltip("테스트용: 켜면 HP가 0이 되어도 죽지 않음")] public bool testNoDeath = true;
+    [Header("강화 스탯 (레벨업 카드)")]
+    [Tooltip("초당 HP 자동 회복량")] public float hpRegen = 0f;
+    [Tooltip("받는 피해 배율 (1 = 100%, 낮을수록 방어력 높음)")] public float damageTakenMultiplier = 1f;
     public float HP { get; private set; }
-    public bool IsDead => HP <= 0f;
+    public bool IsDead => HP <= 0f && !testNoDeath;
 
     CharacterController cc;
     Animator anim;
@@ -29,6 +33,9 @@ public class GiantHealth : MonoBehaviour
         anim = GetComponentInChildren<Animator>();
         ctrl = GetComponent<GiantController>();
     }
+
+    // 모델이 바뀌면(성별 선택) 애니메이터 다시 찾기
+    public void Rebind() { anim = GetComponentInChildren<Animator>(); }
 
     public float Scale => anim ? anim.transform.lossyScale.y : 1f;
     public Vector3 Velocity => ctrl ? ctrl.Velocity : Vector3.zero;
@@ -105,9 +112,17 @@ public class GiantHealth : MonoBehaviour
         return false;
     }
 
+    // 최대 HP 증가 + 늘어난 만큼 즉시 회복
+    public void AddMaxHP(float amount)
+    {
+        maxHP += amount;
+        HP = Mathf.Min(maxHP, HP + amount);
+    }
+
     public void TakeDamage(float dmg)
     {
         if (IsDead) return;
+        dmg *= damageTakenMultiplier;
         HP = Mathf.Max(0, HP - dmg);
         hitFlash = 0.25f;
         if (GiantCamera.Instance) GiantCamera.Instance.Shake(0.12f);
@@ -121,12 +136,14 @@ public class GiantHealth : MonoBehaviour
     void Update()
     {
         hitFlash = Mathf.Max(0, hitFlash - Time.deltaTime);
+        if (!IsDead && hpRegen > 0f) HP = Mathf.Min(maxHP, HP + hpRegen * Time.deltaTime);
         if (IsDead && Input.GetKeyDown(KeyCode.R))
             SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
     }
 
     void OnGUI()
     {
+        if (GameStartMenu.InMenu) return; // 시작 메뉴 중에는 HUD 숨김
         float w = 260, h = 20, x = 20, y = 20;
         GUI.color = new Color(0, 0, 0, 0.6f);
         GUI.DrawTexture(new Rect(x - 3, y - 3, w + 6, h + 6), Texture2D.whiteTexture);
@@ -134,7 +151,7 @@ public class GiantHealth : MonoBehaviour
         GUI.DrawTexture(new Rect(x, y, w * HP / maxHP, h), Texture2D.whiteTexture);
         GUI.color = Color.white;
         var style = new GUIStyle(GUI.skin.label) { fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
-        GUI.Label(new Rect(x, y, w, h), $"GIANT HP  {Mathf.CeilToInt(HP)} / {maxHP:0}", style);
+        GUI.Label(new Rect(x, y, w, h), $"GIANT HP  {Mathf.CeilToInt(HP)} / {maxHP:0}" + (testNoDeath ? "  (TEST)" : ""), style);
         if (IsDead)
         {
             var big = new GUIStyle(GUI.skin.label) { fontSize = 42, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };

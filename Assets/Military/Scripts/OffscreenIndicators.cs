@@ -34,6 +34,7 @@ public class OffscreenIndicators : MonoBehaviour
 
     void OnGUI()
     {
+        if (GameStartMenu.InMenu) return; // 시작 메뉴 중에는 HUD 숨김
         if (Event.current.type != EventType.Repaint || !cam) return;
         if (Time.unscaledTime >= nextScan) { Rescan(); nextScan = Time.unscaledTime + 0.25f; }
 

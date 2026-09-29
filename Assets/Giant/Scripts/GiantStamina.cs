@@ -21,6 +21,13 @@ public class GiantStamina : MonoBehaviour
 
     void Awake() { Stamina = maxStamina; }
 
+    // 최대 스테미나 증가 + 늘어난 만큼 즉시 채움 (레벨업 카드)
+    public void AddMaxStamina(float amount)
+    {
+        maxStamina += amount;
+        Stamina = Mathf.Min(maxStamina, Stamina + amount);
+    }
+
     // GiantController가 매 프레임 호출
     public void Tick(bool running, bool moving, float dt)
     {
@@ -39,6 +46,7 @@ public class GiantStamina : MonoBehaviour
 
     void OnGUI()
     {
+        if (GameStartMenu.InMenu) return; // 시작 메뉴 중에는 HUD 숨김
         float w = 260, h = 12, x = 20, y = 46;
         GUI.color = new Color(0, 0, 0, 0.6f);
         GUI.DrawTexture(new Rect(x - 3, y - 3, w + 6, h + 6), Texture2D.whiteTexture);

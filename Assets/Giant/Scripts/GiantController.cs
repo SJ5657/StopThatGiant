@@ -21,6 +21,8 @@ public class GiantController : MonoBehaviour
     Animator anim;
     GiantStamina stamina;
     float verticalVel, animSpeed;
+    // 모델 크기 1당 CharacterController 치수 (크기를 바꿀 때 비례해서 맞춤)
+    float ccHeightPer, ccRadiusPer, ccCenterYPer, ccStepPer, ccHeightBase, ccCenterBase;
     static readonly int SpeedHash = Animator.StringToHash("Speed");
 
     void Awake()
@@ -29,11 +31,37 @@ public class GiantController : MonoBehaviour
         anim = GetComponentInChildren<Animator>();
         stamina = GetComponent<GiantStamina>();
         if (anim) anim.applyRootMotion = false;
+        float s0 = anim ? anim.transform.localScale.y : 1f;
+        ccHeightPer = cc.height / s0; ccRadiusPer = cc.radius / s0; ccCenterYPer = cc.center.y / s0; ccStepPer = cc.stepOffset / s0;
+        ccHeightBase = ccHeightPer; ccCenterBase = ccCenterYPer;
         if (!cameraTransform && Camera.main) cameraTransform = Camera.main.transform;
         // 거인은 건물/잔해에 막히지 않고 통과 (대신 GiantStomp가 부숨)
         int g = LayerMask.NameToLayer("Giant"), b = LayerMask.NameToLayer("Building"), d = LayerMask.NameToLayer("Debris");
         if (g >= 0 && b >= 0) Physics.IgnoreLayerCollision(g, b, true);
         if (g >= 0 && d >= 0) Physics.IgnoreLayerCollision(g, d, true);
+    }
+
+    // 거인 모델 크기 (기본 32). 발 반경·속도·카메라 거리 등은 모두 이 크기에 비례해서 자동으로 바뀜
+    public float ModelScale => anim ? anim.transform.localScale.y : 1f;
+
+    public void SetModelScale(float s)
+    {
+        if (!anim || s <= 0f) return;
+        anim.transform.localScale = Vector3.one * s;
+        cc.height = ccHeightPer * s;
+        cc.radius = ccRadiusPer * s;
+        cc.center = new Vector3(cc.center.x, ccCenterYPer * s, cc.center.z);
+        cc.stepOffset = Mathf.Min(ccStepPer * s, cc.height * 0.5f);
+    }
+
+    // 모델이 바뀌면(성별 선택) 애니메이터 다시 찾고, 모델 키에 맞춰 충돌 캡슐 높이 조정
+    public void Rebind(float heightFactor = 1f)
+    {
+        anim = GetComponentInChildren<Animator>();
+        if (anim) anim.applyRootMotion = false;
+        ccHeightPer = ccHeightBase * heightFactor;
+        ccCenterYPer = ccCenterBase * heightFactor;
+        SetModelScale(ModelScale);
     }
 
     void Update()
