@@ -37,24 +37,13 @@ public class GiantHealth : MonoBehaviour
     // 모델이 바뀌면(성별 선택) 애니메이터 다시 찾기
     public void Rebind() { anim = GetComponentInChildren<Animator>(); }
 
-    public float Scale => anim ? anim.transform.lossyScale.y : 1f;
+    public float Scale => ctrl ? ctrl.GameScale : (anim ? anim.transform.lossyScale.y : 1f);
     public Vector3 Velocity => ctrl ? ctrl.Velocity : Vector3.zero;
     public Vector3 Center => transform.TransformPoint(cc.center);
 
-    // 어깨 높이(월드 Y). 헬기 비행 고도 상한에 사용
-    public float ShoulderY
-    {
-        get
-        {
-            if (anim && anim.isHuman)
-            {
-                var l = anim.GetBoneTransform(HumanBodyBones.LeftUpperArm);
-                var r = anim.GetBoneTransform(HumanBodyBones.RightUpperArm);
-                if (l && r) return Mathf.Max(l.position.y, r.position.y);
-            }
-            return transform.position.y + cc.height * 0.82f;
-        }
-    }
+    // 어깨 높이(월드 Y). 헬기·전투기 비행 고도에 사용.
+    // 모델 뼈 대신 충돌 캡슐 기준으로 계산해서 남자/여자 거인이 완전히 같은 값이 되게 함.
+    public float ShoulderY => transform.position.y + cc.height * 0.837f;
 
     public Transform Bone(HumanBodyBones b) => anim && anim.isHuman ? anim.GetBoneTransform(b) : null;
 

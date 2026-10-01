@@ -1,22 +1,26 @@
 using UnityEngine;
 
-// 3인칭 카메라: 마우스 회전, 휠 줌, 화면 흔들림. Esc 커서 해제 / 클릭 잠금.
+// 사선 탑뷰 카메라: 위에서 비스듬히 내려다보며 거인을 따라감.
+// 마우스 좌우로 주변을 돌 수 있고, 내려다보는 각도(pitch)는 고정. 휠 줌, 화면 흔들림.
+// Esc 커서 해제 / 클릭 잠금 (커서가 잠겨 있을 때만 마우스로 시점 회전).
 public class GiantCamera : MonoBehaviour
 {
+    GiantController gc;
     public Transform target;
-    [Tooltip("타깃 스케일 기준 바라보는 높이")] public float lookHeight = 1.25f;
-    [Tooltip("타깃 스케일 기준 거리")] public float distance = 3.4f;
-    public float minDistance = 1.5f, maxDistance = 9f;
+    [Tooltip("타깃 스케일 기준 바라보는 높이")] public float lookHeight = 0.6f;
+    [Tooltip("타깃 스케일 기준 거리")] public float distance = 5.5f;
+    public float minDistance = 3f, maxDistance = 10f;
+    [Tooltip("시작 수평 각도 (45 = 오른쪽 뒤 대각선에서 바라봄)")] public float yaw = 45f;
+    [Tooltip("고정 내려다보는 각도 (90 = 수직 탑뷰)")] [Range(10f, 89f)] public float pitch = 50f;
     public float mouseSensitivity = 3f;
-    public float minPitch = -10f, maxPitch = 75f;
     public float smooth = 10f;
     public float minHeightAboveGround = 3f;
 
     public static GiantCamera Instance { get; private set; }
-    float yaw, pitch = 18f, shake;
+    float shake;
 
     void Awake() { Instance = this; }
-    void Start() { if (target) yaw = target.eulerAngles.y; Lock(true); }
+    void Start() { Lock(true); }
     void Lock(bool l) { Cursor.lockState = l ? CursorLockMode.Locked : CursorLockMode.None; Cursor.visible = !l; }
 
     public void Shake(float amount) { shake = Mathf.Min(shake + amount, 2.5f); }
@@ -30,23 +34,24 @@ public class GiantCamera : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.Escape)) Lock(false);
         if (Input.GetMouseButtonDown(0) && !LevelUpCards.IsChoosing) Lock(true); // 카드 고르는 클릭은 무시
         if (Cursor.lockState == CursorLockMode.Locked)
-        {
             yaw += Input.GetAxis("Mouse X") * mouseSensitivity;
-            pitch = Mathf.Clamp(pitch - Input.GetAxis("Mouse Y") * mouseSensitivity, minPitch, maxPitch);
-        }
         distance = Mathf.Clamp(distance - Input.mouseScrollDelta.y * 0.4f, minDistance, maxDistance);
 
-        float s = target.lossyScale.y;
-        Vector3 pivot = target.position + Vector3.up * lookHeight * s;
-        Vector3 desired = pivot - Quaternion.Euler(pitch, yaw, 0) * Vector3.forward * distance * s;
+        if (!gc) gc = target.GetComponentInParent<GiantController>();
+        float s = gc ? gc.GameScale : target.lossyScale.y; // 성별 무관 동일한 카메라 거리
+        // 회전은 마우스로만 바뀌고, 위치는 거인을 따라감 (거인이 돌아도 화면은 돌지 않음)
+        Quaternion rot = Quaternion.Euler(pitch, yaw, 0);
+        Vector3 pivot = (gc ? gc.transform.position : target.position) + Vector3.up * lookHeight * s;
+        Vector3 desired = pivot - rot * Vector3.forward * distance * s;
         desired.y = Mathf.Max(desired.y, minHeightAboveGround);
-        transform.position = Vector3.Lerp(transform.position, desired, 1f - Mathf.Exp(-smooth * Time.deltaTime));
-        transform.rotation = Quaternion.LookRotation(pivot - transform.position);
+        float k = 1f - Mathf.Exp(-smooth * Time.deltaTime);
+        transform.position = Vector3.Lerp(transform.position, desired, k);
+        transform.rotation = Quaternion.Slerp(transform.rotation, rot, k);
 
         if (shake > 0.001f)
         {
             float t = Time.time * 40f;
-            transform.position += new Vector3(Mathf.PerlinNoise(t, 0) - 0.5f, Mathf.PerlinNoise(0, t) - 0.5f, 0) * shake * s * 0.15f;
+            transform.position += (transform.right * (Mathf.PerlinNoise(t, 0) - 0.5f) + transform.up * (Mathf.PerlinNoise(0, t) - 0.5f)) * shake * s * 0.15f;
             shake = Mathf.MoveTowards(shake, 0, Time.deltaTime * 3f);
         }
     }

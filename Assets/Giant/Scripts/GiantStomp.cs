@@ -25,6 +25,8 @@ public class GiantStomp : MonoBehaviour
     }
 
     // 모델이 바뀌면(성별 선택) 애니메이터와 뼈 다시 찾기
+    GiantController gc;
+
     public void Rebind()
     {
         anim = GetComponentInChildren<Animator>();
@@ -40,7 +42,8 @@ public class GiantStomp : MonoBehaviour
     void LateUpdate() // 애니메이션 적용 후 뼈 위치 기준
     {
         if (GameStartMenu.InMenu || !anim) return;
-        float s = anim.transform.lossyScale.y;
+        if (!gc) gc = GetComponent<GiantController>();
+        float s = gc ? gc.GameScale : anim.transform.lossyScale.y;
         Vector3 push = controller ? controller.Velocity : transform.forward;
         Check(lFoot, footRadius * s, push); Check(rFoot, footRadius * s, push);
         Check(lToe, footRadius * s, push); Check(rToe, footRadius * s, push);

@@ -44,14 +44,20 @@ public class GiantController : MonoBehaviour
     // 거인 모델 크기 (기본 32). 발 반경·속도·카메라 거리 등은 모두 이 크기에 비례해서 자동으로 바뀜
     public float ModelScale => anim ? anim.transform.localScale.y : 1f;
 
+    // 모델마다 원본 키가 달라서(남자 모델이 더 큼) 화면상 키를 맞추려고 모델 크기를 다르게 줌.
+    // 게임 수치는 이 보정값을 곱한 GameScale 기준이라 성별에 관계없이 완전히 동일.
+    [HideInInspector] public float scaleCompensation = 1f;
+    public float GameScale => (anim ? anim.transform.lossyScale.y : 1f) * scaleCompensation;
+
     public void SetModelScale(float s)
     {
         if (!anim || s <= 0f) return;
         anim.transform.localScale = Vector3.one * s;
-        cc.height = ccHeightPer * s;
-        cc.radius = ccRadiusPer * s;
-        cc.center = new Vector3(cc.center.x, ccCenterYPer * s, cc.center.z);
-        cc.stepOffset = Mathf.Min(ccStepPer * s, cc.height * 0.5f);
+        float gs = s * scaleCompensation; // 충돌 캡슐도 게임 기준 크기로 (성별 무관 동일)
+        cc.height = ccHeightPer * gs;
+        cc.radius = ccRadiusPer * gs;
+        cc.center = new Vector3(cc.center.x, ccCenterYPer * gs, cc.center.z);
+        cc.stepOffset = Mathf.Min(ccStepPer * gs, cc.height * 0.5f);
     }
 
     // 모델이 바뀌면(성별 선택) 애니메이터 다시 찾고, 모델 키에 맞춰 충돌 캡슐 높이 조정
@@ -66,7 +72,7 @@ public class GiantController : MonoBehaviour
 
     void Update()
     {
-        float scale = anim ? anim.transform.lossyScale.y : 1f;
+        float scale = GameScale;
         Vector2 input = new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical")) + externalInput;
         input = Vector2.ClampMagnitude(input, 1f);
         bool wantRun = externalRun || Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);

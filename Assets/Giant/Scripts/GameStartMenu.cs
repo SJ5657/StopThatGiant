@@ -39,9 +39,12 @@ public class GameStartMenu : MonoBehaviour
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     static void ResetStatics() { lastChoice = -1; }
 
+    float referenceScale = 1f; // 첫 번째(여자) 모델 크기 = 게임 기준 크기
+
     void Awake()
     {
         Instance = this;
+        if (options != null && options.Length > 0 && options[0].model) referenceScale = options[0].model.transform.localScale.y;
         if (!giant) giant = FindObjectOfType<GiantController>();
         if (!giantCamera) giantCamera = FindObjectOfType<GiantCamera>();
         if (options == null || options.Length == 0) { state = State.Playing; return; }
@@ -100,6 +103,8 @@ public class GameStartMenu : MonoBehaviour
         var o = options[i];
         if (giant)
         {
+            // 화면상 키를 맞추려고 모델 크기가 달라도, 게임 수치는 기준 크기로 동일하게
+            giant.scaleCompensation = o.model ? referenceScale / o.model.transform.localScale.y : 1f;
             giant.Rebind(o.collisionHeightFactor);
             var stomp = giant.GetComponent<GiantStomp>(); if (stomp) stomp.Rebind();
             var hp = giant.GetComponent<GiantHealth>(); if (hp) hp.Rebind();
@@ -169,7 +174,7 @@ public class GameStartMenu : MonoBehaviour
         if (!giantCamera || !giant) return;
         var cam = giantCamera.transform;
         var m = options[previewing].model ? options[previewing].model.transform : giant.transform;
-        float h = m.lossyScale.y * 1.7f * options[previewing].collisionHeightFactor;
+        float h = giant.GameScale * 1.7f;
 
         Vector3 basePos = giant.transform.position;
         Vector3 fwd = giant.transform.forward; fwd.y = 0; fwd = fwd.sqrMagnitude > 0.01f ? fwd.normalized : Vector3.forward;
