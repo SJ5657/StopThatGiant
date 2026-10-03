@@ -2,7 +2,7 @@ using System;
 using UnityEngine;
 
 // 레벨업 시스템: 점수를 얻을 때 같은 양의 경험치(XP)를 획득. 화면 하단에 경험치 게이지 표시.
-// 레벨업 보상은 LevelUpCards가 OnLevelUp 이벤트를 받아 스탯 강화 카드로 제공.
+// 레벨업 보상은 LevelUpCards가 OnLevelUp 이벤트를 받아 능력치 강화 카드로 제공.
 public class LevelSystem : MonoBehaviour
 {
     public static LevelSystem Instance { get; private set; }
@@ -11,7 +11,7 @@ public class LevelSystem : MonoBehaviour
     public int baseXp = 1000;          // 1 → 2레벨에 필요한 경험치
     public float growth = 1.35f;       // 레벨마다 필요 경험치 증가 배율
     public int maxLevel = 99;
-    [Tooltip("경험치 획득 배율 (레벨업 카드로 증가)")] public float xpMultiplier = 1f;
+    [Tooltip("경험치 획득 배율")] public float xpMultiplier = 1f;
 
     [Header("게이지")]
     [Range(0.2f, 1f)] public float barWidthRatio = 0.5f;

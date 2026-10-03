@@ -1,12 +1,14 @@
 using UnityEngine;
 
-// 거인의 발/정강이 주변에 닿는 건물을 매 프레임 검사해서 부순다.
+// 거인의 발/정강이 주변에 닿는 건물을 매 프레임 검사해서 공격력만큼 피해를 준다 (지나갈 때마다 1번).
 public class GiantStomp : MonoBehaviour
 {
-    [Tooltip("모델 스케일 기준 발 반경")] public float footRadius = 0.11f;
-    [Tooltip("모델 스케일 기준 다리 반경")] public float legRadius = 0.08f;
-    [Tooltip("이동 중 몸 앞/아래 쪽을 쓸고 지나가는 반경 (모델 스케일 기준). 0이면 발/다리만")] public float bodyRadius = 0.16f;
+    [Tooltip("모델 스케일 기준 발 반경")] public float footRadius = 0.08f;
+    [Tooltip("모델 스케일 기준 다리 반경")] public float legRadius = 0.06f;
+    [Tooltip("이동 중 몸 앞/아래 쪽을 쓸고 지나가는 반경 (모델 스케일 기준). 0이면 발/다리만")] public float bodyRadius = 0.12f;
     [Tooltip("몸 쓸기 높이 (모델 스케일 기준)")] public float bodyHeight = 0.35f;
+    [Header("공격력")]
+    [Tooltip("건물을 지나갈 때마다 주는 피해")] public float attackPower = 100f;
     public LayerMask buildingMask;
     public LayerMask militaryMask;
 
@@ -56,7 +58,7 @@ public class GiantStomp : MonoBehaviour
             Vector3 a = transform.position + Vector3.up * r;
             Vector3 b = transform.position + Vector3.up * Mathf.Max(r, bodyHeight * s);
             int n = Physics.OverlapCapsuleNonAlloc(a, b, r, hits, buildingMask, QueryTriggerInteraction.Ignore);
-            for (int i = 0; i < n; i++) if (hits[i]) BuildingDestruction.Break(hits[i].gameObject, transform.position, push);
+            for (int i = 0; i < n; i++) if (hits[i]) BuildingDestruction.Hit(hits[i].gameObject, transform.position, push, attackPower);
         }
     }
 
@@ -76,7 +78,7 @@ public class GiantStomp : MonoBehaviour
     {
         int n = Physics.OverlapSphereNonAlloc(p, r, hits, buildingMask, QueryTriggerInteraction.Ignore);
         for (int i = 0; i < n; i++)
-            if (hits[i]) BuildingDestruction.Break(hits[i].gameObject, p, push);
+            if (hits[i]) BuildingDestruction.Hit(hits[i].gameObject, p, push, attackPower);
 
         // 탱크 밟기
         n = Physics.OverlapSphereNonAlloc(p, r, hits, militaryMask, QueryTriggerInteraction.Ignore);
@@ -85,5 +87,17 @@ public class GiantStomp : MonoBehaviour
             var tank = hits[i] ? hits[i].GetComponentInParent<TankAI>() : null;
             if (tank) tank.Crush();
         }
+    }
+
+    void OnGUI()
+    {
+        if (GameStartMenu.InMenu) return; // 시작 메뉴 중에는 HUD 숨김
+        var style = new GUIStyle(GUI.skin.label) { fontSize = 14, fontStyle = FontStyle.Bold };
+        var r = new Rect(20, 64, 260, 22);
+        GUI.color = new Color(0, 0, 0, 0.7f);
+        GUI.Label(new Rect(r.x + 1, r.y + 1, r.width, r.height), $"공격력  {attackPower:0}", style);
+        GUI.color = new Color(1f, 0.6f, 0.35f);
+        GUI.Label(r, $"공격력  {attackPower:0}", style);
+        GUI.color = Color.white;
     }
 }

@@ -10,7 +10,7 @@ public class Bomb : MonoBehaviour
     [Header("폭발")]
     public const float DefaultBlastRadius = 90f;
     public float blastRadius = DefaultBlastRadius;
-    public float maxDamage = 480f;
+    public float maxDamage = 1200f;
     [Range(0, 1)] public float edgeDamageFactor = 0.35f;
     public float explosionSize = 65f;
     [Range(0, 1)] public float buildingShardMultiplier = 0.25f;

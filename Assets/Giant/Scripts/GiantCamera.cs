@@ -28,11 +28,11 @@ public class GiantCamera : MonoBehaviour
     void LateUpdate()
     {
         if (!target) return;
-        // 레벨업 카드 선택 중(게임 일시정지)에는 카메라를 완전히 고정.
+        // 카드 고르는 중(게임 일시정지)에는 카메라를 완전히 고정.
         // (멈춘 상태에서 흔들림 오프셋이 매 프레임 누적되어 카메라가 엉뚱한 곳으로 밀려나던 문제 방지)
-        if (LevelUpCards.IsChoosing || Time.deltaTime <= 0f) return;
+        if (CardDraft.IsOpen || Time.deltaTime <= 0f) return;
         if (Input.GetKeyDown(KeyCode.Escape)) Lock(false);
-        if (Input.GetMouseButtonDown(0) && !LevelUpCards.IsChoosing) Lock(true); // 카드 고르는 클릭은 무시
+        if (Input.GetMouseButtonDown(0) && !CardDraft.IsOpen) Lock(true); // 카드 고르는 클릭은 무시
         if (Cursor.lockState == CursorLockMode.Locked)
             yaw += Input.GetAxis("Mouse X") * mouseSensitivity;
         distance = Mathf.Clamp(distance - Input.mouseScrollDelta.y * 0.4f, minDistance, maxDistance);

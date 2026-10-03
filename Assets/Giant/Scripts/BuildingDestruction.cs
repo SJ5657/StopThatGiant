@@ -24,6 +24,15 @@ public class BuildingDestruction : MonoBehaviour
     [Tooltip("파편 기본 색 (불투명 어두운 회색)")] public Color shardColor = new Color(0.30f, 0.30f, 0.32f);
     [Range(0, 1)] public float colorTintFromBuilding = 0f; // 건물 색 반영 비율
 
+    [Header("건물 체력 (거인 공격)")]
+    [Tooltip("모든 건물의 기본 체력")] public float hpBase = 150f;
+    [Tooltip("건물 부피(m³)당 추가 체력")] public float hpPerVolume = 1f / 50f;
+    [Tooltip("이만큼 떨어져 있다가 다시 닿으면 '새로 지나감'으로 보고 피해 (초)")] public float reTouchGap = 0.3f;
+    [Tooltip("계속 닿아 있을 때 반복 피해 간격 (초)")] public float repeatInterval = 1f;
+    [Tooltip("다 부서지기 직전 땅으로 꺼지는 정도 (건물 높이 비율)")] [Range(0, 1)] public float maxSink = 0.35f;
+    [Tooltip("다 부서지기 직전 기울어지는 각도")] public float maxTilt = 10f;
+    [Tooltip("맞을 때마다 떨어져 나가는 파편 양 (완전 파괴 대비 비율)")] [Range(0, 1)] public float chipShardRatio = 0.3f;
+
     [Header("먼지")]
     public bool dust = true;
     public Material dustMaterial;
@@ -155,6 +164,35 @@ public class BuildingDestruction : MonoBehaviour
         return m;
     }
 
+    // 거인 공격: 건물에 피해를 주고, 체력이 다 떨어지면 무너뜨림.
+    // 위층(Tier)에 닿아도 아래 건물 본체 체력이 깎임.
+    public static void Hit(GameObject building, Vector3 hitPoint, Vector3 push, float damage)
+    {
+        if (Instance == null) { Break(building, hitPoint, push); return; }
+        Transform t = building.transform;
+        while (t.parent && t.parent.gameObject.layer == building.layer) t = t.parent;
+        if (!t.gameObject.activeInHierarchy) return;
+
+        var hp = t.GetComponent<BuildingHealth>();
+        if (!hp)
+        {
+            Vector3 s = t.lossyScale;
+            hp = t.gameObject.AddComponent<BuildingHealth>();
+            hp.Init(Instance.hpBase + s.x * s.y * s.z * Instance.hpPerVolume);
+        }
+        if (!hp.Touch(damage, hitPoint, push, Instance.reTouchGap, Instance.repeatInterval)) return;
+
+        if (hp.HP <= 0f) { Break(t.gameObject, hitPoint, push); return; }
+
+        // 아직 버팀: 일부 파편이 떨어져 나가고 먼지가 일어남
+        Instance.shardMul = Instance.chipShardRatio;
+        Instance.dustMul = Instance.chipShardRatio;
+        Instance.SpawnShards(t, hitPoint, push);
+        Instance.shardMul = 1f;
+        Instance.dustMul = 1f;
+        if (GiantCamera.Instance) GiantCamera.Instance.Shake(0.08f);
+    }
+
     // shardMultiplier: 파편/먼지 양 배율 (폭탄처럼 한꺼번에 많이 부술 때 줄여서 사용)
     public static void Break(GameObject building, Vector3 hitPoint, Vector3 push, bool countIt = true, float shardMultiplier = 1f)
     {
@@ -174,6 +212,9 @@ public class BuildingDestruction : MonoBehaviour
         foreach (Transform child in b.transform)
             if (child.gameObject.activeSelf && child.GetComponent<Collider>()) SpawnShards(child, hitPoint, push);
         SpawnShards(b.transform, hitPoint, push);
+        ExplosiveBuildings.OnBroken(b); // 빨간 건물이면 폭발
+        BoostBuildings.OnBroken(b, countIt); // 노란 건물이면 무한 달리기
+        HealBuildings.OnBroken(b, countIt); // 초록 건물이면 회복 영역
         b.SetActive(false);
         Destroy(b, 0.1f);
         if (countIt)

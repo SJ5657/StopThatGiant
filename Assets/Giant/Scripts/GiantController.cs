@@ -6,6 +6,7 @@ public class GiantController : MonoBehaviour
 {
     [Tooltip("원래 크기(1배) 기준 걷기 속도 m/s")] public float walkSpeed = 1.4f;
     [Tooltip("원래 크기(1배) 기준 달리기 속도 m/s")] public float runSpeed = 3.8f;
+    [Tooltip("노란 건물 무한 달리기 중 달리기 속도 배율 (Shift 없이 자동으로 달림)")] public float boostRunMultiplier = 1.5f;
     public float turnSpeed = 360f;
     public float gravity = 9.81f;
     public Transform cameraTransform;
@@ -76,6 +77,8 @@ public class GiantController : MonoBehaviour
         Vector2 input = new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical")) + externalInput;
         input = Vector2.ClampMagnitude(input, 1f);
         bool wantRun = externalRun || Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
+        bool boosted = stamina && stamina.Infinite; // 노란 건물 효과: 자동 달리기 + 더 빠르게
+        if (boosted) wantRun = true;
 
         Vector3 fwd = Vector3.forward, right = Vector3.right;
         if (cameraTransform)
@@ -89,7 +92,7 @@ public class GiantController : MonoBehaviour
         IsRunning = wantRun && moving && (stamina == null || stamina.CanRun);
         if (stamina) stamina.Tick(IsRunning, moving, Time.deltaTime);
         float mult = stamina ? stamina.SpeedMultiplier : 1f;
-        float speed = moving ? (IsRunning ? runSpeed : walkSpeed * mult) * input.magnitude : 0f;
+        float speed = moving ? (IsRunning ? runSpeed * (boosted ? boostRunMultiplier : 1f) : walkSpeed * mult) * input.magnitude : 0f;
 
         if (moving)
             transform.rotation = Quaternion.RotateTowards(transform.rotation, Quaternion.LookRotation(moveDir.normalized), turnSpeed * Time.deltaTime);
@@ -116,7 +119,7 @@ public class GiantController : MonoBehaviour
         {
             anim.SetFloat(SpeedHash, animSpeed);
             // 지친 상태로 걸을 때는 걷기 애니메이션도 느리게 재생 (발 미끄러짐 방지 + 지친 느낌)
-            anim.speed = (moving && !IsRunning) ? mult : 1f;
+            anim.speed = (moving && !IsRunning) ? mult : (IsRunning && boosted ? boostRunMultiplier : 1f);
         }
     }
 }

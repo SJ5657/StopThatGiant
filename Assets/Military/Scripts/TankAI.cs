@@ -20,7 +20,7 @@ public class TankAI : MonoBehaviour
     [Header("사격")]
     public float fireInterval = 2.6f;
     public float shellSpeed = 180f;
-    public float damage = 25f;
+    public float damage = 65f;
     public float spread = 7f;
 
     public bool IsDead { get; private set; }

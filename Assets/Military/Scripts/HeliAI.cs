@@ -24,7 +24,7 @@ public class HeliAI : MonoBehaviour
     [Header("사격")]
     public float fireInterval = 3.2f;
     public float rocketSpeed = 120f;
-    public float damage = 15f;
+    public float damage = 40f;
     public float homing = 1.3f;
 
     [Header("충돌")]

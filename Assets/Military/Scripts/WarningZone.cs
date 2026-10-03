@@ -69,7 +69,7 @@ public class WarningZone : MonoBehaviour
         if (Time.time - born > duration + 8f) Destroy(gameObject); // 안전장치
     }
 
-    static Mesh Annulus(float inner, float outer, Color cIn, Color cOut)
+    public static Mesh Annulus(float inner, float outer, Color cIn, Color cOut)
     {
         int seg = 72;
         var v = new Vector3[seg * 2]; var c = new Color[seg * 2]; var t = new int[seg * 6];
@@ -88,7 +88,7 @@ public class WarningZone : MonoBehaviour
         return m;
     }
 
-    static Mesh Wall(Color bottom, Color top)
+    public static Mesh Wall(Color bottom, Color top)
     {
         int seg = 72;
         var v = new Vector3[seg * 2]; var c = new Color[seg * 2]; var t = new int[seg * 6];

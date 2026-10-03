@@ -7,7 +7,7 @@ public class GiantHealth : MonoBehaviour
     public static GiantHealth Instance { get; private set; }
     public float maxHP = 2000f;
     [Tooltip("테스트용: 켜면 HP가 0이 되어도 죽지 않음")] public bool testNoDeath = true;
-    [Header("강화 스탯 (레벨업 카드)")]
+    [Header("능력치")]
     [Tooltip("초당 HP 자동 회복량")] public float hpRegen = 0f;
     [Tooltip("받는 피해 배율 (1 = 100%, 낮을수록 방어력 높음)")] public float damageTakenMultiplier = 1f;
     public float HP { get; private set; }
@@ -16,7 +16,7 @@ public class GiantHealth : MonoBehaviour
     CharacterController cc;
     Animator anim;
     GiantController ctrl;
-    float hitFlash;
+    float hitFlash, healGlow;
 
     static readonly HumanBodyBones[] AimBones =
     {
@@ -108,6 +108,14 @@ public class GiantHealth : MonoBehaviour
         HP = Mathf.Min(maxHP, HP + amount);
     }
 
+    // HP 회복 (초록 회복 영역)
+    public void Heal(float amount)
+    {
+        if (IsDead || amount <= 0f) return;
+        HP = Mathf.Min(maxHP, HP + amount);
+        healGlow = 0.2f;
+    }
+
     public void TakeDamage(float dmg)
     {
         if (IsDead) return;
@@ -125,6 +133,7 @@ public class GiantHealth : MonoBehaviour
     void Update()
     {
         hitFlash = Mathf.Max(0, hitFlash - Time.deltaTime);
+        healGlow = Mathf.Max(0, healGlow - Time.deltaTime);
         if (!IsDead && hpRegen > 0f) HP = Mathf.Min(maxHP, HP + hpRegen * Time.deltaTime);
         if (IsDead && Input.GetKeyDown(KeyCode.R))
             SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
@@ -136,7 +145,7 @@ public class GiantHealth : MonoBehaviour
         float w = 260, h = 20, x = 20, y = 20;
         GUI.color = new Color(0, 0, 0, 0.6f);
         GUI.DrawTexture(new Rect(x - 3, y - 3, w + 6, h + 6), Texture2D.whiteTexture);
-        GUI.color = hitFlash > 0 ? new Color(1f, 0.9f, 0.9f) : new Color(0.9f, 0.2f, 0.25f);
+        GUI.color = hitFlash > 0 ? new Color(1f, 0.9f, 0.9f) : healGlow > 0 ? Color.Lerp(new Color(0.9f, 0.2f, 0.25f), new Color(0.3f, 1f, 0.45f), 0.5f + 0.5f * Mathf.Sin(Time.time * 10f)) : new Color(0.9f, 0.2f, 0.25f);
         GUI.DrawTexture(new Rect(x, y, w * HP / maxHP, h), Texture2D.whiteTexture);
         GUI.color = Color.white;
         var style = new GUIStyle(GUI.skin.label) { fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };

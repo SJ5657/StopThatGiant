@@ -21,8 +21,8 @@ public class MilitarySpawner : MonoBehaviour
     public int maxHelis = 6;
 
     [Header("전투기 등장 조건")]
-    public int firstJetAt = 100;
-    public int buildingsPerExtraJet = 80;
+    public int firstJetAt = 250;
+    public int buildingsPerExtraJet = 120;
     public int maxJets = 4;
 
     [Header("스폰")]

@@ -18,19 +18,31 @@ public class GiantStamina : MonoBehaviour
     public float SpeedMultiplier => Exhausted ? exhaustedSpeedMultiplier : 1f;
 
     float regenAt;
+    float infiniteUntil = -1f;
+    public bool Infinite => Time.time < infiniteUntil;
+    public float InfiniteLeft => Mathf.Max(0f, infiniteUntil - Time.time);
 
     void Awake() { Stamina = maxStamina; }
 
-    // 최대 스테미나 증가 + 늘어난 만큼 즉시 채움 (레벨업 카드)
+    // 최대 스테미나 증가 + 늘어난 만큼 즉시 채움
     public void AddMaxStamina(float amount)
     {
         maxStamina += amount;
         Stamina = Mathf.Min(maxStamina, Stamina + amount);
     }
 
+    // 스테미나를 즉시 가득 채우고 seconds초 동안 달려도 줄지 않음 (노란 건물)
+    public void Boost(float seconds)
+    {
+        Stamina = maxStamina;
+        Exhausted = false;
+        infiniteUntil = Mathf.Max(infiniteUntil, Time.time + seconds);
+    }
+
     // GiantController가 매 프레임 호출
     public void Tick(bool running, bool moving, float dt)
     {
+        if (Infinite) { Stamina = maxStamina; Exhausted = false; return; }
         if (running)
         {
             Stamina = Mathf.Max(0f, Stamina - runDrain * dt);
@@ -50,7 +62,9 @@ public class GiantStamina : MonoBehaviour
         float w = 260, h = 12, x = 20, y = 46;
         GUI.color = new Color(0, 0, 0, 0.6f);
         GUI.DrawTexture(new Rect(x - 3, y - 3, w + 6, h + 6), Texture2D.whiteTexture);
-        Color c = Exhausted
+        Color c = Infinite
+            ? Color.Lerp(new Color(1f, 0.95f, 0.3f), Color.white, Mathf.PingPong(Time.time * 6f, 1f))
+            : Exhausted
             ? Color.Lerp(new Color(0.6f, 0.3f, 0.1f), new Color(1f, 0.5f, 0.1f), Mathf.PingPong(Time.time * 4f, 1f))
             : new Color(0.95f, 0.8f, 0.2f);
         GUI.color = c;
@@ -61,8 +75,9 @@ public class GiantStamina : MonoBehaviour
             GUI.color = Color.white;
             GUI.DrawTexture(new Rect(x + w * recoverThreshold / maxStamina - 1, y - 2, 2, h + 4), Texture2D.whiteTexture);
         }
-        GUI.color = Color.white;
+        GUI.color = Infinite ? new Color(0.15f, 0.1f, 0f) : Color.white; // 밝은 노란 바 위에서는 어두운 글씨
         var style = new GUIStyle(GUI.skin.label) { fontStyle = FontStyle.Bold, fontSize = 10, alignment = TextAnchor.MiddleCenter };
-        GUI.Label(new Rect(x, y - 4, w, h + 8), Exhausted ? "EXHAUSTED" : "STAMINA", style);
+        GUI.Label(new Rect(x, y - 4, w, h + 8), Infinite ? $"무한 달리기  {InfiniteLeft:0.0}s" : Exhausted ? "EXHAUSTED" : "STAMINA", style);
+        GUI.color = Color.white;
     }
 }
