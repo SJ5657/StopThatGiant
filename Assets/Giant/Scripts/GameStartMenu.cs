@@ -93,6 +93,7 @@ public class GameStartMenu : MonoBehaviour
     void OnDestroy()
     {
         if (!Application.isPlaying) return;
+        RestoreSpringBones();
         if (Instance != this) return;
         if (InMenu) Time.timeScale = 1f;
         Instance = null;
@@ -145,6 +146,7 @@ public class GameStartMenu : MonoBehaviour
     void StartGame()
     {
         if (selected < 0) return;
+        RestoreSpringBones();
         lastChoice = selected;
         InfiniteMode = pendingInfinite;
         lastInfinite = InfiniteMode;
@@ -191,6 +193,7 @@ public class GameStartMenu : MonoBehaviour
 
         int want = state == State.Select ? (hover >= 0 ? hover : (selected >= 0 ? selected : previewing)) : previewing;
         if (want != previewing) SetActiveModel(want);
+        MenuSpringBones();
 
         if (!giantCamera || !giant) return;
         var cam = giantCamera.transform;
@@ -221,6 +224,27 @@ public class GameStartMenu : MonoBehaviour
         cam.position = Vector3.Lerp(cam.position, desired, k);
         menuFocus = Vector3.Lerp(menuFocus, focus, k);
         cam.rotation = Quaternion.LookRotation(menuFocus - cam.position);
+    }
+
+    // 메뉴 중 머리카락·가슴(VRM 스프링본): 메뉴는 Time.timeScale = 0이라 VRM이 Time.deltaTime(0)으로 스프링본을 계산하면
+    // 되돌아가는 힘(강성·중력)은 0이 되고 관성만 남아 비정상적으로 꿈틀거림 → 메뉴 동안엔 VRM 자동 갱신을 끄고
+    // 실제 경과 시간(unscaledDeltaTime)으로 스프링본만 직접 갱신. (이 모델들은 컨스트레인트·컨트롤 리그가 없음)
+    UniVRM10.Vrm10Instance menuVrm;
+
+    void MenuSpringBones()
+    {
+        var m = previewing >= 0 && previewing < options.Length ? options[previewing].model : null;
+        var vrm = m ? m.GetComponent<UniVRM10.Vrm10Instance>() : null;
+        if (vrm != menuVrm) { RestoreSpringBones(); menuVrm = vrm; }
+        if (!vrm) return;
+        vrm.UpdateType = UniVRM10.Vrm10Instance.UpdateTypes.None;
+        vrm.Runtime.SpringBone.Process(Mathf.Min(Time.unscaledDeltaTime, 1f / 30f));
+    }
+
+    void RestoreSpringBones()
+    {
+        if (menuVrm) menuVrm.UpdateType = UniVRM10.Vrm10Instance.UpdateTypes.LateUpdate;
+        menuVrm = null;
     }
 
     // 편집 모드 미리보기: 시작 화면과 같은 발목 구도로 카메라를 놓음 (흔들림 없음).
