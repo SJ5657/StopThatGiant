@@ -2,25 +2,33 @@ using System.Collections.Generic;
 using UnityEngine;
 
 // 길가 아이템 + 패시브 아이템.
-// 거인 주변 도로 위에 아이템 상자가 랜덤으로 나타나고, 거인이 밟으면 아이템 카드 3장 중 1장을 골라 장착 (CardDraft로 표시).
-// 패시브 아이템 = 특수 건물 생성기: 장착하면 즉시, 그리고 일정 주기마다 거인 주변 흰 건물이 그 특수 건물로 바뀜.
-// 같은 아이템을 또 고르면 강화(Lv +1)되어 한 번에 생기는 건물 수가 늘어남. 보유 개수 제한 없음.
+// 거인 주변 도로 위에 아이템 상자가 낮은 확률로 계속 나타나고, 거인이 밟으면 아이템 카드 3장 중 1장을 고름.
+// 없는 아이템은 새로 장착(등급 없음), 이미 가진 아이템은 강화(희귀도 랜덤).
+// 패시브 아이템 = 특수 건물 등장 확률(거인 주변에 들어온 흰 건물마다 그 확률로 특수 건물로 바뀜)
+// 또는 거인의 식욕(시민 잡아먹기 활성화 + 먹을 때 HP 회복).
+// 보유 아이템의 강화 카드는 레벨업 카드에도 능력치 카드와 섞여 나옴 → 고르면 등장 확률 증가.
 public class PassiveItems : MonoBehaviour
 {
     public static PassiveItems Instance { get; private set; }
 
     [Header("길가 아이템")]
-    [Tooltip("동시에 놓여 있을 수 있는 아이템 수")] public int maxPickups = 3;
-    [Tooltip("아이템이 새로 생기는 간격(초)")] public float pickupInterval = 12f;
+    [Tooltip("동시에 놓여 있을 수 있는 아이템 수")] public int maxPickups = 2;
+    [Tooltip("이 간격(초)마다 아이템이 생길지 확률을 굴림")] public float pickupInterval = 10f;
+    [Tooltip("굴릴 때마다 아이템이 생길 확률")] [Range(0, 1)] public float pickupChance = 0.2f;
     [Tooltip("거인으로부터 이 거리 범위의 도로 위에 생김 (m)")] public Vector2 pickupDistance = new Vector2(120f, 320f);
     [Tooltip("거인과 이만큼 멀어지면 사라짐 (m)")] public float despawnDistance = 900f;
     [Tooltip("줍는 반경 (거인 크기 기준)")] public float pickupRadius = 0.7f;
     public Color pickupColor = new Color(0.75f, 0.45f, 1f);
 
     [Header("특수 건물 아이템")]
-    [Tooltip("일반 등급 1장으로 늘어나는 '한 번에 생기는 건물 수'")] public float buildingsPerCard = 2f;
-    [Tooltip("장착 중 건물이 생기는 주기(초)")] public float spawnPeriod = 15f;
-    [Tooltip("종류별로 동시에 있을 수 있는 최대 수")] public int maxAlivePerType = 40;
+    [Tooltip("새 아이템을 얻었을 때의 등장 확률")] [Range(0, 1)] public float newItemChance = 0.01f;
+    [Tooltip("일반 등급 강화 1번으로 오르는 등장 확률 (희귀도가 높을수록 배로 늘어남)")] [Range(0, 1)] public float upgradeChance = 0.005f;
+    [Tooltip("등장 확률 상한")] [Range(0, 1)] public float maxChance = 0.2f;
+    [Tooltip("주변 건물에 확률을 굴리는 간격(초)")] public float rollInterval = 0.5f;
+
+    [Header("시민 먹기 아이템 (거인의 식욕)")]
+    [Tooltip("새로 얻었을 때 시민 한 명당 HP 회복량")] public float newEatHeal = 20f;
+    [Tooltip("일반 등급 강화 1번으로 늘어나는 회복량 (희귀도가 높을수록 배로 늘어남)")] public float upgradeEatHeal = 10f;
 
     class Item
     {
@@ -28,13 +36,14 @@ public class PassiveItems : MonoBehaviour
         public Color color;
         public SpecialBuildingSet set;
         public int level;        // 0 = 미보유
-        public float perSpawn;   // 한 번에 생기는 건물 수
-        public float nextAt;
+        public float chance;     // 주변 건물이 이 건물로 바뀔 확률
+        public GiantEat eat;     // 시민 먹기 아이템이면 연결 (set 대신)
+        public float heal;       // 시민 먹기: 한 명당 HP 회복량
     }
     readonly List<Item> items = new List<Item>();
     readonly List<Item> owned = new List<Item>();
     readonly List<Transform> pickups = new List<Transform>();
-    float nextPickupAt;
+    float nextPickupAt, nextRollAt;
     CityGenerator city;
     GiantController ctrl;
     string toast; Color toastColor; float toastUntil;
@@ -49,6 +58,8 @@ public class PassiveItems : MonoBehaviour
         AddItem(FindObjectOfType<ExplosiveBuildings>(), "폭약 창고", "폭약", "빨간 건물이 생겨남.\n부수면 폭발해 주변까지 파괴.", new Color(1f, 0.35f, 0.3f));
         AddItem(FindObjectOfType<BoostBuildings>(), "발전소", "발전", "노란 건물이 생겨남.\n부수면 스테미나 + 자동 질주.", new Color(1f, 0.85f, 0.2f));
         AddItem(FindObjectOfType<HealBuildings>(), "구호소", "구호", "초록 건물이 생겨남.\n부수면 HP 회복 영역 생성.", new Color(0.35f, 0.9f, 0.45f));
+        var eat = FindObjectOfType<GiantEat>();
+        if (eat) items.Add(new Item { eat = eat, name = "거인의 식욕", icon = "식욕", desc = "시민을 잡아먹을 수 있게 됨.\n(없으면 밟기만 함)", color = new Color(1f, 0.5f, 0.6f) });
         nextPickupAt = Time.time + 3f;
     }
 
@@ -64,9 +75,12 @@ public class PassiveItems : MonoBehaviour
         if (!g || g.IsDead) return;
         Vector3 gp = g.transform.position;
 
-        // 장착한 아이템: 주기마다 특수 건물 생성
-        foreach (var it in owned)
-            if (Time.time >= it.nextAt) { it.nextAt = Time.time + spawnPeriod; SpawnBuildings(it, false); }
+        // 장착한 아이템: 거인 주변에 새로 들어온 건물마다 등장 확률을 굴림
+        if (Time.time >= nextRollAt)
+        {
+            nextRollAt = Time.time + rollInterval;
+            foreach (var it in owned) if (it.set) it.set.RollNearby(gp);
+        }
 
         // 길가 아이템: 줍기 / 멀어지면 제거 / 모자라면 생성
         float pickR = pickupRadius * (ctrl ? ctrl.GameScale : 27f);
@@ -78,10 +92,11 @@ public class PassiveItems : MonoBehaviour
             if (d.sqrMagnitude <= pickR * pickR) { Collect(p); pickups.RemoveAt(i); }
             else if (d.sqrMagnitude > despawnDistance * despawnDistance) { Destroy(p.gameObject); pickups.RemoveAt(i); }
         }
+        // 보유 아이템 수와 관계없이 낮은 확률로 계속 생김
         if (items.Count > 0 && pickups.Count < maxPickups && Time.time >= nextPickupAt)
         {
             nextPickupAt = Time.time + pickupInterval;
-            if (TryRoadPoint(gp, out Vector3 pos)) pickups.Add(CreatePickup(pos));
+            if (Random.value < pickupChance && TryRoadPoint(gp, out Vector3 pos)) pickups.Add(CreatePickup(pos));
         }
 
         // 아이템 상자 애니메이션 (둥실둥실 + 회전)
@@ -95,14 +110,6 @@ public class PassiveItems : MonoBehaviour
     }
 
     // ───────────── 패시브 아이템 ─────────────
-    void SpawnBuildings(Item it, bool announce)
-    {
-        int want = Mathf.Min(Mathf.RoundToInt(it.perSpawn), maxAlivePerType - it.set.Count);
-        if (want <= 0) return;
-        int n = it.set.Spawn(want);
-        if (announce && n > 0) Toast($"주변에 {it.set.DisplayName} {n}채가 나타났다!", it.color);
-    }
-
     void Collect(Transform p)
     {
         Destroy(p.gameObject);
@@ -111,45 +118,104 @@ public class PassiveItems : MonoBehaviour
         {
             title = "아이템 획득!",
             titleColor = pickupColor,
-            subtitle = "장착할 패시브 아이템을 고르세요",
+            subtitle = "아이템을 고르세요 (이미 가진 아이템은 강화)",
             build = BuildItemCards
         });
     }
 
+    // 길가 아이템을 먹었을 때: 아이템 최대 3장. 없는 아이템은 새 아이템(등급 없음), 이미 가진 아이템은 강화(희귀도 랜덤)
     List<CardDraft.Card> BuildItemCards()
     {
         var pool = new List<Item>(items);
         var result = new List<CardDraft.Card>();
-        if (pool.Count == 0) return result;
         for (int i = pool.Count - 1; i > 0; i--) { int j = Random.Range(0, i + 1); (pool[i], pool[j]) = (pool[j], pool[i]); }
-
-        for (int i = 0; i < 3; i++)
-        {
-            var it = pool[i % pool.Count];
-            int r = CardDraft.RollRarity();
-            float amount = buildingsPerCard * CardDraft.RarityPower[r];
-            bool isNew = it.level == 0;
-            result.Add(new CardDraft.Card
-            {
-                badge = isNew ? "NEW  새 아이템" : $"강화  Lv {it.level} → {it.level + 1}",
-                badgeColor = isNew ? new Color(1f, 0.85f, 0.3f) : new Color(0.55f, 0.9f, 1f),
-                name = it.name, stat = $"{it.set.DisplayName} 생성", color = it.color, rarity = r,
-                amount = $"+{amount:0.#}채", desc = it.desc,
-                current = isNew ? "미보유" : $"{it.perSpawn:0.#}채", preview = $"{it.perSpawn + amount:0.#}채",
-                footer = $"장착 즉시 + {spawnPeriod:0}초마다 주변에 생성",
-                pick = () => Equip(it, amount)
-            });
-        }
+        for (int i = 0; i < Mathf.Min(3, pool.Count); i++)
+            result.Add(pool[i].level == 0 ? NewItemCard(pool[i]) : UpgradeCard(pool[i], CardDraft.RollRarity()));
         return result;
     }
 
+    // 레벨업 카드에 섞일 '보유 아이템 강화' 후보 (희귀도는 LevelUpCards가 굴려서 넘겨줌)
+    public List<System.Func<int, CardDraft.Card>> UpgradeOffers()
+    {
+        var offers = new List<System.Func<int, CardDraft.Card>>();
+        foreach (var o in owned) { var it = o; offers.Add(r => UpgradeCard(it, r)); }
+        return offers;
+    }
+
+    static string Pct(float p) => $"{p * 100f:0.##}%";
+
+    CardDraft.Card NewItemCard(Item it)
+    {
+        if (it.eat)
+        {
+            float heal = newEatHeal;
+            return new CardDraft.Card
+            {
+                badge = "NEW  새 아이템", badgeColor = new Color(1f, 0.85f, 0.3f),
+                name = it.name, stat = "시민 잡아먹기", color = it.color, rarity = -1,
+                amount = $"HP +{heal:0}", desc = it.desc,
+                current = "밟기만 함", preview = $"먹을 때 HP +{heal:0}",
+                footer = "가까이 온 시민을 잡아먹고 HP 회복",
+                pick = () => Equip(it, heal)
+            };
+        }
+        float amount = newItemChance;
+        return new CardDraft.Card
+        {
+            badge = "NEW  새 아이템", badgeColor = new Color(1f, 0.85f, 0.3f),
+            name = it.name, stat = $"{it.set.DisplayName} 등장 확률", color = it.color, rarity = -1,
+            amount = Pct(amount), desc = it.desc,
+            current = "미보유", preview = Pct(Mathf.Min(amount, maxChance)),
+            footer = "주변 건물이 이 확률로 바뀜",
+            pick = () => Equip(it, amount)
+        };
+    }
+
+    CardDraft.Card UpgradeCard(Item it, int rarity)
+    {
+        if (it.eat)
+        {
+            float heal = Mathf.Round(upgradeEatHeal * CardDraft.RarityPower[rarity]);
+            return new CardDraft.Card
+            {
+                badge = $"아이템 강화  Lv {it.level} → {it.level + 1}", badgeColor = new Color(0.55f, 0.9f, 1f),
+                name = it.name, stat = "먹을 때 HP 회복", color = it.color, rarity = rarity,
+                amount = $"+{heal:0}", desc = it.desc,
+                current = $"HP +{it.heal:0}", preview = $"HP +{it.heal + heal:0}",
+                footer = "시민 한 명당 회복량",
+                pick = () => Equip(it, heal)
+            };
+        }
+        float amount = upgradeChance * CardDraft.RarityPower[rarity];
+        return new CardDraft.Card
+        {
+            badge = $"아이템 강화  Lv {it.level} → {it.level + 1}", badgeColor = new Color(0.55f, 0.9f, 1f),
+            name = it.name, stat = $"{it.set.DisplayName} 등장 확률", color = it.color, rarity = rarity,
+            amount = "+" + Pct(amount), desc = it.desc,
+            current = Pct(it.chance), preview = Pct(Mathf.Min(it.chance + amount, maxChance)),
+            footer = it.chance + amount >= maxChance ? $"최대 {Pct(maxChance)}" : "주변 건물이 이 확률로 바뀜",
+            pick = () => Equip(it, amount)
+        };
+    }
+
+    // 장착/강화: 확률을 올리고 바로 주변 건물에 적용 (시민 먹기는 회복량 증가 + 먹기 활성화)
     void Equip(Item it, float amount)
     {
         if (it.level == 0) owned.Add(it);
         it.level++;
-        it.perSpawn += amount;
-        it.nextAt = Time.time + spawnPeriod;
-        SpawnBuildings(it, true);
+        if (it.eat)
+        {
+            it.heal += amount;
+            it.eat.unlocked = true;
+            it.eat.healPerCivilian = it.heal;
+            if (it.level == 1) Toast("이제 시민을 잡아먹을 수 있다!", it.color);
+            return;
+        }
+        it.chance = Mathf.Min(it.chance + amount, maxChance);
+        int n = it.set.SetChance(it.chance);
+        var g = GiantHealth.Instance;
+        if (g) n += it.set.RollNearby(g.transform.position);
+        if (n > 0) Toast($"주변에 {it.set.DisplayName} {n}채가 나타났다!", it.color);
     }
 
     // ───────────── 길가 아이템 ─────────────
@@ -252,11 +318,9 @@ public class PassiveItems : MonoBehaviour
             var r = new Rect(x0 + (i % perRow) * (size + gap), y0 + (i / perRow) * (size + gap), size, size);
             CardDraft.Box(new Rect(r.x - 2, r.y - 2, r.width + 4, r.height + 4), new Color(0, 0, 0, 0.6f));
             CardDraft.Box(r, new Color(it.color.r * 0.45f, it.color.g * 0.45f, it.color.b * 0.45f, 0.95f));
-            // 다음 생성까지 남은 시간 (아래에서 차오름)
-            float k = 1f - Mathf.Clamp01((it.nextAt - Time.time) / spawnPeriod);
-            CardDraft.Box(new Rect(r.x, r.yMax - r.height * k, r.width, r.height * k), new Color(1f, 1f, 1f, 0.12f));
-            CardDraft.ShadowLabel(new Rect(r.x, r.y + 2, r.width, r.height - 14), it.icon, CardDraft.Style(14, FontStyle.Bold, TextAnchor.MiddleCenter), Color.white);
-            CardDraft.ShadowLabel(new Rect(r.x, r.yMax - 16, r.width - 3, 15), $"Lv{it.level}", CardDraft.Style(11, FontStyle.Bold, TextAnchor.MiddleRight), it.color);
+            CardDraft.ShadowLabel(new Rect(r.x + 3, r.y + 1, r.width - 3, 13), $"Lv{it.level}", CardDraft.Style(10, FontStyle.Bold, TextAnchor.MiddleLeft), new Color(1f, 1f, 1f, 0.8f));
+            CardDraft.ShadowLabel(new Rect(r.x, r.y + 6, r.width, r.height - 18), it.icon, CardDraft.Style(14, FontStyle.Bold, TextAnchor.MiddleCenter), Color.white);
+            CardDraft.ShadowLabel(new Rect(r.x, r.yMax - 16, r.width - 3, 15), it.eat ? $"+{it.heal:0}" : Pct(it.chance), CardDraft.Style(11, FontStyle.Bold, TextAnchor.MiddleRight), it.color);
         }
     }
 }

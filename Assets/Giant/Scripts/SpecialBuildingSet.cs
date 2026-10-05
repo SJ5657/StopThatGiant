@@ -2,7 +2,8 @@ using System.Collections.Generic;
 using UnityEngine;
 
 // 특수 건물(빨강·노랑·초록 등) 공통: 건물을 특정 색으로 칠하고 목록으로 관리.
-// 게임 시작 시 ratio 비율만큼 칠하고(기본 0 = 처음엔 흰 건물만), 레벨업 카드로 Spawn을 불러 거인 주변에 새로 등장시킴.
+// 게임 시작 시 ratio 비율만큼 칠하고(기본 0 = 처음엔 흰 건물만), 패시브 아이템이 등장 확률(Chance)을 정하면
+// 거인 주변에 들어온 건물마다 그 확률로 이 건물로 바뀜.
 // 서로 다른 특수 건물끼리는 절대 겹치지 않음.
 public abstract class SpecialBuildingSet : MonoBehaviour
 {
@@ -10,8 +11,7 @@ public abstract class SpecialBuildingSet : MonoBehaviour
     [Tooltip("게임 시작 시 이 건물로 바꿀 비율 (0 = 처음엔 없고 레벨업 카드로만 등장)")] [Range(0, 0.2f)] public float ratio = 0f;
     [Tooltip("0이면 매번 다른 배치")] public int seed = 0;
     public Color color = Color.white;
-    [Tooltip("카드로 등장시킬 때 거인 주변 이 반경 안의 건물에서 고름 (m)")] public float spawnRadius = 350f;
-    [Tooltip("거인 바로 옆에는 생기지 않게 하는 최소 거리 (m)")] public float spawnMinDistance = 60f;
+    [Tooltip("등장 확률을 굴리는 거인 주변 반경 (m). 이 안에 처음 들어온 건물마다 한 번씩 굴림")] public float rollRadius = 350f;
 
     // 화면 안내용 이름 (예: "빨간 건물")
     public abstract string DisplayName { get; }
@@ -75,41 +75,40 @@ public abstract class SpecialBuildingSet : MonoBehaviour
         }
     }
 
-    // 거인 주변의 멀쩡한 흰 건물 count채를 이 건물로 바꿈. 실제로 바꾼 수를 돌려줌.
-    public int Spawn(int count)
-    {
-        var g = GiantHealth.Instance;
-        Vector3 c = g ? g.transform.position : Vector3.zero;
-        float rMin = spawnMinDistance * spawnMinDistance, rMax = spawnRadius * spawnRadius;
+    // ───────────── 등장 확률 (패시브 아이템) ─────────────
+    // 거인 주변 rollRadius 안에 들어온 건물마다 딱 한 번 확률을 굴려, 당첨되면 이 건물로 바뀜.
+    public float Chance { get; private set; }
+    readonly HashSet<GameObject> rolled = new HashSet<GameObject>();
 
-        var near = new List<GameObject>();
-        var far = new List<GameObject>();
+    // 이미 무너졌거나, 특수 건물이거나, 거인에게 맞아 금이 간 건물은 바꾸지 않음
+    static bool Paintable(GameObject b) => b && b.activeInHierarchy && !IsSpecial(b) && !b.GetComponent<BuildingHealth>();
+
+    // 아직 굴리지 않은 주변 건물에 확률 적용. 새로 바뀐 수를 돌려줌
+    public int RollNearby(Vector3 center)
+    {
+        if (Chance <= 0f) return 0;
+        float r2 = rollRadius * rollRadius;
+        int n = 0;
         foreach (var b in Buildings)
         {
-            // 이미 무너졌거나, 특수 건물이거나, 거인에게 맞아 금이 간 건물은 제외
-            if (!b || !b.activeInHierarchy || IsSpecial(b) || b.GetComponent<BuildingHealth>()) continue;
-            Vector3 d = b.transform.position - c; d.y = 0f;
-            float sq = d.sqrMagnitude;
-            if (sq < rMin) continue;
-            (sq <= rMax ? near : far).Add(b);
+            if (!b) continue;
+            Vector3 d = b.transform.position - center; d.y = 0f;
+            if (d.sqrMagnitude > r2 || !rolled.Add(b)) continue;
+            if (Paintable(b) && rng.NextDouble() < Chance) { Paint(b); n++; }
         }
-
-        int n = 0;
-        n += PaintRandom(near, count);
-        if (n < count) n += PaintRandom(far, count - n); // 주변에 모자라면 도시 어디서든
         return n;
     }
 
-    int PaintRandom(List<GameObject> pool, int count)
+    // 확률 변경. 올라간 경우 이미 굴린 건물에도 늘어난 만큼 추가로 굴려서 '처음부터 이 확률이었던 것'처럼 맞춤
+    public int SetChance(float p)
     {
+        float old = Chance;
+        Chance = Mathf.Clamp01(p);
+        if (Chance <= old || old >= 1f) return 0;
+        float extra = (Chance - old) / (1f - old);
         int n = 0;
-        for (int i = 0; i < pool.Count && n < count; i++)
-        {
-            int j = rng.Next(i, pool.Count);
-            (pool[i], pool[j]) = (pool[j], pool[i]);
-            Paint(pool[i]);
-            n++;
-        }
+        foreach (var b in rolled)
+            if (Paintable(b) && rng.NextDouble() < extra) { Paint(b); n++; }
         return n;
     }
 

@@ -23,14 +23,25 @@ public class HeliAI : MonoBehaviour
 
     [Header("사격")]
     public float fireInterval = 3.2f;
-    public float rocketSpeed = 120f;
+    public float rocketSpeed = 80f;
     public float damage = 40f;
-    public float homing = 1.3f;
+    public float homing = 0.55f;
 
     [Header("충돌")]
     [Tooltip("거인 몸에 이 반경 안으로 닿으면 폭발")] public float contactRadius = 10f;
 
     public bool IsDead { get; private set; }
+    [Tooltip("체력 (방귀 가스 등 지속 피해용)")] public float maxHP = 40f;
+    float hp = -1f;
+
+    // 지속 피해 (방귀 가스). 체력이 다 떨어지면 추락
+    public void TakeDamage(float dmg)
+    {
+        if (IsDead) return;
+        if (hp < 0f) hp = maxHP;
+        hp -= dmg;
+        if (hp <= 0f) Explode();
+    }
     float angle, nextFire;
     Vector3 vel, fallSpin;
 
@@ -120,8 +131,11 @@ public class HeliAI : MonoBehaviour
         float side = Random.value < 0.5f ? -1f : 1f;
         Vector3 origin = transform.position + transform.right * side * 4f - transform.up * 2f + transform.forward * 3f;
         Vector3 aim = g.GetAimPoint();
+        // 방귀 가스(연막) 안에서는 유도도 못 하고 아무 데나 쏨
+        bool smoke = GasCloud.InSmoke(transform.position);
+        if (smoke) aim += Random.insideUnitSphere * g.Scale * 1.5f;
         Vector3 dir = (aim - origin).normalized;
         CombatFX.Muzzle(origin, dir, 2f);
-        CombatFX.Spawn(CombatFX.Kind.Rocket, origin, dir, rocketSpeed, damage, homing);
+        CombatFX.Spawn(CombatFX.Kind.Rocket, origin, dir, rocketSpeed, damage, smoke ? 0f : homing);
     }
 }

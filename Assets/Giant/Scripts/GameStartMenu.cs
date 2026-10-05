@@ -3,7 +3,11 @@ using UnityEngine;
 // 게임 시작 화면 → 성별(거인 모델) 선택 → 게임 시작.
 // 메뉴 동안에는 게임을 멈추고(Time.timeScale = 0) 게임 HUD를 숨기며, 배경에 거인을 보여주면서 카메라가 천천히 흔들린다.
 // 성별 카드에 마우스를 올리면 배경의 거인이 그 모델로 바뀌어 미리보기됨. 성별을 고른 뒤에만 '게임 시작'이 활성화.
-// 사망 후 R로 재시작하면 시작 화면 없이 같은 성별로 바로 시작.
+// 시작 화면: 게임 시작(HP 0이면 패배) / 무한모드(HP 0이 되어도 죽지 않음) / 게임 종료.
+// 사망 후 R로 재시작하면 시작 화면 없이 같은 성별·같은 모드로 바로 시작.
+// [ExecuteAlways]: 재생 전(편집 모드)에도 Game 창에 시작 화면을 미리보기로 그림 — 화면 그리기와 카메라 배치만 하고,
+// 모델 교체·시간 정지·입력·버튼 동작 같은 게임 로직은 재생 중에만 실행.
+[ExecuteAlways]
 public class GameStartMenu : MonoBehaviour
 {
     public static GameStartMenu Instance { get; private set; }
@@ -23,6 +27,11 @@ public class GameStartMenu : MonoBehaviour
     public string gameTitle = "Stop That Giant";
     public string subtitle = "도시를 짓밟고, 몰려드는 군대를 물리쳐라!";
 
+    [Header("시작 화면 카메라 (거인 키 기준 비율) — 발목 아래만 보이게")]
+    public float titleCameraHeight = 0.02f;
+    public float titleCameraDistance = 0.28f;
+    public float titleFocusHeight = 0.05f;
+
     [Header("연결")]
     public GiantController giant;
     public GiantCamera giantCamera;
@@ -36,13 +45,18 @@ public class GameStartMenu : MonoBehaviour
     Vector3 menuFocus;
 
     static int lastChoice = -1; // 재시작 시 같은 성별로 바로 시작
+    static bool lastInfinite;   // 재시작 시 같은 모드로
+    // 무한모드: HP가 0이 되어도 죽지 않음 (시작 화면의 '무한모드' 버튼으로 시작). 일반 '게임 시작'은 HP 0이면 패배
+    public static bool InfiniteMode { get; private set; }
+    bool pendingInfinite; // 시작 화면에서 고른 모드 (성별 선택 후 시작할 때 확정)
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-    static void ResetStatics() { lastChoice = -1; }
+    static void ResetStatics() { lastChoice = -1; lastInfinite = false; InfiniteMode = false; }
 
     float referenceScale = 1f; // 첫 번째(여자) 모델 크기 = 게임 기준 크기
 
     void Awake()
     {
+        if (!Application.isPlaying) return; // 편집 모드: 미리보기만
         Instance = this;
         if (options != null && options.Length > 0 && options[0].model) referenceScale = options[0].model.transform.localScale.y;
         if (!giant) giant = FindObjectOfType<GiantController>();
@@ -52,6 +66,7 @@ public class GameStartMenu : MonoBehaviour
         if (lastChoice >= 0 && lastChoice < options.Length)
         {
             selected = lastChoice;
+            InfiniteMode = lastInfinite;
             state = State.Playing;
             Time.timeScale = 1f;
             SetActiveModel(selected);
@@ -59,6 +74,7 @@ public class GameStartMenu : MonoBehaviour
         else
         {
             state = State.Title;
+            InfiniteMode = false;
             Time.timeScale = 0f;
             SetActiveModel(0);
         }
@@ -67,6 +83,7 @@ public class GameStartMenu : MonoBehaviour
 
     void Start()
     {
+        if (!Application.isPlaying) return;
         started = true;
         if (options == null || options.Length == 0) return;
         if (state == State.Playing) FinalizeChoice();
@@ -75,6 +92,7 @@ public class GameStartMenu : MonoBehaviour
 
     void OnDestroy()
     {
+        if (!Application.isPlaying) return;
         if (Instance != this) return;
         if (InMenu) Time.timeScale = 1f;
         Instance = null;
@@ -128,6 +146,8 @@ public class GameStartMenu : MonoBehaviour
     {
         if (selected < 0) return;
         lastChoice = selected;
+        InfiniteMode = pendingInfinite;
+        lastInfinite = InfiniteMode;
         state = State.Playing;
         FinalizeChoice();
         Time.timeScale = 1f;
@@ -145,14 +165,14 @@ public class GameStartMenu : MonoBehaviour
 
     void Update()
     {
-        if (!InMenu) return;
+        if (!Application.isPlaying || !InMenu) return;
         Cursor.lockState = CursorLockMode.None; Cursor.visible = true;
         if (Time.timeScale != 0f) Time.timeScale = 0f;
         if (Time.unscaledTime - stateAt < 0.2f) return;
 
         if (state == State.Title)
         {
-            if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter) || Input.GetKeyDown(KeyCode.Space)) GoSelect();
+            if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter) || Input.GetKeyDown(KeyCode.Space)) { pendingInfinite = false; GoSelect(); }
         }
         else if (state == State.Select)
         {
@@ -166,6 +186,7 @@ public class GameStartMenu : MonoBehaviour
     // 메뉴 카메라: 거인 정면에서 천천히 좌우로 흔들림. 게임이 시작되면 GiantCamera가 이어받아 뒤쪽으로 부드럽게 이동
     void LateUpdate()
     {
+        if (!Application.isPlaying) { PreviewCamera(); return; }
         if (!InMenu) return;
 
         int want = state == State.Select ? (hover >= 0 ? hover : (selected >= 0 ? selected : previewing)) : previewing;
@@ -181,9 +202,19 @@ public class GameStartMenu : MonoBehaviour
         Vector3 right = Vector3.Cross(Vector3.up, fwd);
         Vector3 dir = Quaternion.Euler(0, Mathf.Sin(Time.unscaledTime * 0.25f) * 18f, 0) * fwd;
 
-        Vector3 focus = basePos + Vector3.up * h * 0.55f;
-        if (state == State.Title) focus += right * h * 0.4f; // 거인을 화면 오른쪽에 (왼쪽엔 제목)
-        Vector3 desired = basePos + Vector3.up * h * 0.62f + dir * h * 1.45f;
+        Vector3 focus, desired;
+        if (state == State.Title)
+        {
+            // 시작 화면: 땅바닥 높이에서 거인의 발목 아래만 (소인의 눈높이), 발은 화면 오른쪽 (왼쪽엔 제목)
+            Vector3 feetDir = Quaternion.Euler(0, Mathf.Sin(Time.unscaledTime * 0.25f) * 6f, 0) * fwd;
+            focus = basePos + Vector3.up * h * titleFocusHeight + right * h * 0.06f;
+            desired = basePos + Vector3.up * h * titleCameraHeight + feetDir * h * titleCameraDistance;
+        }
+        else
+        {
+            focus = basePos + Vector3.up * h * 0.55f;
+            desired = basePos + Vector3.up * h * 0.62f + dir * h * 1.45f;
+        }
 
         if (!camInit) { cam.position = desired; menuFocus = focus; camInit = true; }
         float k = 1f - Mathf.Exp(-3f * Time.unscaledDeltaTime);
@@ -192,10 +223,29 @@ public class GameStartMenu : MonoBehaviour
         cam.rotation = Quaternion.LookRotation(menuFocus - cam.position);
     }
 
+    // 편집 모드 미리보기: 시작 화면과 같은 발목 구도로 카메라를 놓음 (흔들림 없음).
+    // 위치가 실제로 달라질 때만 옮겨서 씬이 매 프레임 변경됨으로 표시되지 않게 함
+    void PreviewCamera()
+    {
+        if (!giant) giant = FindObjectOfType<GiantController>();
+        if (!giantCamera) giantCamera = FindObjectOfType<GiantCamera>();
+        if (!giant || !giantCamera || options == null || options.Length == 0 || !options[0].model) return;
+        float h = options[0].model.transform.lossyScale.y * 1.7f; // 편집 모드에선 GameScale 대신 모델 크기로
+        Vector3 basePos = giant.transform.position;
+        Vector3 fwd = giant.transform.forward; fwd.y = 0; fwd = fwd.sqrMagnitude > 0.01f ? fwd.normalized : Vector3.forward;
+        Vector3 right = Vector3.Cross(Vector3.up, fwd);
+        Vector3 focus = basePos + Vector3.up * h * titleFocusHeight + right * h * 0.06f;
+        Vector3 pos = basePos + Vector3.up * h * titleCameraHeight + fwd * h * titleCameraDistance;
+        Quaternion rot = Quaternion.LookRotation(focus - pos);
+        var cam = giantCamera.transform;
+        if ((cam.position - pos).sqrMagnitude > 0.0001f || Quaternion.Angle(cam.rotation, rot) > 0.01f)
+            cam.SetPositionAndRotation(pos, rot);
+    }
+
     // ───────────── 화면 ─────────────
     void OnGUI()
     {
-        if (!InMenu) return;
+        if (Application.isPlaying && !InMenu) return; // 편집 모드에선 항상 시작 화면 미리보기
         GUI.depth = -200;
         float W = Screen.width, H = Screen.height;
         float fade = Mathf.Clamp01((Time.unscaledTime - stateAt) / 0.35f);
@@ -222,8 +272,9 @@ public class GameStartMenu : MonoBehaviour
             Style(Mathf.RoundToInt(H * 0.028f), FontStyle.Bold, TextAnchor.MiddleLeft), new Color(1f, 1f, 1f, 0.9f * fade));
 
         float bw = Mathf.Clamp(W * 0.22f, 240f, 340f), bh = Mathf.Clamp(H * 0.075f, 48f, 72f);
-        if (MenuButton(new Rect(x, H * 0.5f, bw, bh), "게임 시작", new Color(1f, 0.55f, 0.15f), true, fade)) { GoSelect(); return; }
-        if (MenuButton(new Rect(x, H * 0.5f + bh * 1.3f, bw, bh), "게임 종료", new Color(0.42f, 0.45f, 0.52f), true, fade)) { Quit(); return; }
+        if (MenuButton(new Rect(x, H * 0.5f, bw, bh), "게임 시작", new Color(1f, 0.55f, 0.15f), true, fade)) { pendingInfinite = false; GoSelect(); return; }
+        if (MenuButton(new Rect(x, H * 0.5f + bh * 1.3f, bw, bh), "무한모드", new Color(0.55f, 0.4f, 1f), true, fade)) { pendingInfinite = true; GoSelect(); return; }
+        if (MenuButton(new Rect(x, H * 0.5f + bh * 2.6f, bw, bh), "게임 종료", new Color(0.42f, 0.45f, 0.52f), true, fade)) { Quit(); return; }
 
         ShadowLabel(new Rect(x, H - 50, W * 0.5f, 30), "Enter : 게임 시작",
             Style(14, FontStyle.Normal, TextAnchor.MiddleLeft), new Color(1, 1, 1, 0.6f * fade));
@@ -259,7 +310,7 @@ public class GameStartMenu : MonoBehaviour
         ShadowLabel(new Rect(0, H * 0.815f, W, 28), can ? $"선택: {options[selected].label}" : "성별을 먼저 선택하세요",
             Style(18, FontStyle.Bold, TextAnchor.MiddleCenter), can ? new Color(options[selected].color.r, options[selected].color.g, options[selected].color.b, fade) : new Color(1, 1, 1, 0.6f * fade));
         float bw = Mathf.Clamp(W * 0.22f, 240f, 340f), bh = Mathf.Clamp(H * 0.075f, 48f, 72f);
-        if (MenuButton(new Rect(W * 0.5f - bw * 0.5f, H * 0.87f, bw, bh), "게임 시작", new Color(1f, 0.55f, 0.15f), can, fade)) { StartGame(); return; }
+        if (MenuButton(new Rect(W * 0.5f - bw * 0.5f, H * 0.87f, bw, bh), pendingInfinite ? "무한모드 시작" : "게임 시작", pendingInfinite ? new Color(0.55f, 0.4f, 1f) : new Color(1f, 0.55f, 0.15f), can, fade)) { StartGame(); return; }
         if (MenuButton(new Rect(24, H * 0.87f + bh * 0.2f, 130, bh * 0.7f), "← 뒤로", new Color(0.42f, 0.45f, 0.52f), true, fade)) { GoTitle(); return; }
     }
 
@@ -301,7 +352,7 @@ public class GameStartMenu : MonoBehaviour
         ShadowLabel(r, text, Style(Mathf.RoundToInt(r.height * 0.4f), FontStyle.Bold, TextAnchor.MiddleCenter),
             new Color(1, 1, 1, (enabled ? 1f : 0.45f) * alpha));
         if (enabled && e.type == EventType.MouseDown && e.button == 0 && rect.Contains(e.mousePosition)
-            && Time.unscaledTime - stateAt > 0.2f)
+            && Time.unscaledTime - stateAt > 0.2f && Application.isPlaying) // 편집 모드 미리보기에선 눌리지 않음
         {
             e.Use();
             return true;

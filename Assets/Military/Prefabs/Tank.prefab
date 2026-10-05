@@ -2121,11 +2121,11 @@ MonoBehaviour:
   muzzle: {fileID: 3574530830818960905}
   minRange: 90
   maxRange: 220
-  moveSpeed: 60
+  moveSpeed: 50
   turnSpeed: 240
   turretTurnSpeed: 90
   fireInterval: 2.6
-  shellSpeed: 180
+  shellSpeed: 120
   damage: 65
   spread: 7
   repositionAfter: 1.5

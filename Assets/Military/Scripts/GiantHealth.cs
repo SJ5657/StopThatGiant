@@ -5,13 +5,15 @@ using UnityEngine.SceneManagement;
 public class GiantHealth : MonoBehaviour
 {
     public static GiantHealth Instance { get; private set; }
-    public float maxHP = 2000f;
-    [Tooltip("테스트용: 켜면 HP가 0이 되어도 죽지 않음")] public bool testNoDeath = true;
+    public float maxHP = 1200f;
+    [Tooltip("테스트용: 켜면 HP가 0이 되어도 죽지 않음")] public bool testNoDeath = false;
     [Header("능력치")]
     [Tooltip("초당 HP 자동 회복량")] public float hpRegen = 0f;
     [Tooltip("받는 피해 배율 (1 = 100%, 낮을수록 방어력 높음)")] public float damageTakenMultiplier = 1f;
     public float HP { get; private set; }
-    public bool IsDead => HP <= 0f && !testNoDeath;
+    // 무한모드(시작 화면 버튼) 또는 테스트 옵션이면 HP가 0이 되어도 죽지 않음
+    bool NoDeath => testNoDeath || GameStartMenu.InfiniteMode;
+    public bool IsDead => HP <= 0f && !NoDeath;
 
     CharacterController cc;
     Animator anim;
@@ -116,13 +118,16 @@ public class GiantHealth : MonoBehaviour
         healGlow = 0.2f;
     }
 
-    public void TakeDamage(float dmg)
+    public void TakeDamage(float dmg) => TakeDamage(dmg, true);
+
+    // shake = false: 권총처럼 약하고 잦은 공격은 화면을 흔들지 않음
+    public void TakeDamage(float dmg, bool shake)
     {
         if (IsDead) return;
         dmg *= damageTakenMultiplier;
         HP = Mathf.Max(0, HP - dmg);
-        hitFlash = 0.25f;
-        if (GiantCamera.Instance) GiantCamera.Instance.Shake(0.12f);
+        hitFlash = shake ? 0.25f : Mathf.Max(hitFlash, 0.08f);
+        if (shake && GiantCamera.Instance) GiantCamera.Instance.Shake(0.12f);
         if (IsDead)
         {
             if (ctrl) ctrl.enabled = false;
@@ -149,7 +154,7 @@ public class GiantHealth : MonoBehaviour
         GUI.DrawTexture(new Rect(x, y, w * HP / maxHP, h), Texture2D.whiteTexture);
         GUI.color = Color.white;
         var style = new GUIStyle(GUI.skin.label) { fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
-        GUI.Label(new Rect(x, y, w, h), $"GIANT HP  {Mathf.CeilToInt(HP)} / {maxHP:0}" + (testNoDeath ? "  (TEST)" : ""), style);
+        GUI.Label(new Rect(x, y, w, h), $"GIANT HP  {Mathf.CeilToInt(HP)} / {maxHP:0}" + (GameStartMenu.InfiniteMode ? "  (무한모드)" : testNoDeath ? "  (TEST)" : ""), style);
         if (IsDead)
         {
             var big = new GUIStyle(GUI.skin.label) { fontSize = 42, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };

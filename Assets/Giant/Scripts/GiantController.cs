@@ -26,8 +26,25 @@ public class GiantController : MonoBehaviour
     float ccHeightPer, ccRadiusPer, ccCenterYPer, ccStepPer, ccHeightBase, ccCenterBase;
     static readonly int SpeedHash = Animator.StringToHash("Speed");
 
+    // 얼굴이 빨개지는 문제: 얼굴 피부 MToon 재질의 그림자색(_ShadeColor)이 분홍빛이라, 빛을 등지거나 그늘이 지면
+    // 볼·코 주변이 붉은 띠처럼 보임 → 그림자색을 살짝 어두운 살색으로 바꿈. 앞머리 그림자도 얼굴엔 안 지게 함.
+    static readonly Color FaceShadeColor = new Color(0.93f, 0.86f, 0.84f);
+
+    void FixFaceShadows()
+    {
+        foreach (var r in GetComponentsInChildren<Renderer>(true))
+        {
+            if (r.name != "Face") continue;
+            r.receiveShadows = false;
+            foreach (var m in r.materials)
+                if (m && m.HasProperty("_ShadeColor") && m.GetColor("_ShadeColor") != Color.white) // 눈·눈썹 등 흰색은 그대로
+                    m.SetColor("_ShadeColor", FaceShadeColor);
+        }
+    }
+
     void Awake()
     {
+        FixFaceShadows();
         cc = GetComponent<CharacterController>();
         anim = GetComponentInChildren<Animator>();
         stamina = GetComponent<GiantStamina>();
@@ -66,6 +83,7 @@ public class GiantController : MonoBehaviour
     {
         anim = GetComponentInChildren<Animator>();
         if (anim) anim.applyRootMotion = false;
+        FixFaceShadows();
         ccHeightPer = ccHeightBase * heightFactor;
         ccCenterYPer = ccCenterBase * heightFactor;
         SetModelScale(ModelScale);

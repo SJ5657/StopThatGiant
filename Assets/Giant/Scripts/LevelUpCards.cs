@@ -3,10 +3,17 @@ using System.Collections.Generic;
 using UnityEngine;
 
 // 메가봉크 스타일 레벨업: 레벨이 오르면 능력치 강화 카드 3장 중 1장을 고름 (CardDraft로 표시).
-// 카드는 순수 능력치 강화 (보유/슬롯 개념 없음). 희귀도가 높을수록 강화 폭이 큼.
+// 카드는 능력치 강화 + 보유한 패시브 아이템의 강화(PassiveItems). 희귀도가 높을수록 강화 폭이 큼.
 // 한 번에 여러 레벨이 오르면 그 횟수만큼 연속으로 고름.
+// chooseCards를 끄면 카드 없이 레벨업마다 HP·몸 크기·공격력이 자동으로 오름.
 public class LevelUpCards : MonoBehaviour
 {
+    [Header("레벨업 방식")]
+    [Tooltip("켜면 능력치 카드 3장 중 고르기, 끄면 아래 자동 성장")] public bool chooseCards = false;
+    [Tooltip("자동 성장: 레벨업마다 최대 HP 증가 (늘어난 만큼 회복)")] public float autoHp = 100f;
+    [Tooltip("자동 성장: 레벨업마다 몸 크기 증가 (처음 크기 기준 비율)")] public float autoSize = 0.03f;
+    [Tooltip("자동 성장: 레벨업마다 공격력 증가")] public float autoAttack = 8f;
+
     [Header("몸 크기 강화")]
     [Tooltip("몸 크기 최대 배율 (처음 크기 기준)")] public float maxSizeMultiplier = 2.5f;
     [Tooltip("카드 선택 후 커지는 데 걸리는 시간(초)")] public float growTime = 0.8f;
@@ -117,6 +124,7 @@ public class LevelUpCards : MonoBehaviour
     // ───────────── 레벨업 ─────────────
     void HandleLevelUp(int level)
     {
+        if (!chooseCards) { AutoGrow(); return; }
         CardDraft.Enqueue(new CardDraft.Request
         {
             title = $"LEVEL UP!  LV {level}",
@@ -125,30 +133,35 @@ public class LevelUpCards : MonoBehaviour
         });
     }
 
+    // 후보 = 능력치 + 보유한 패시브 아이템 강화. 섞어서 3장, 카드마다 희귀도를 따로 굴림
     List<CardDraft.Card> BuildCards()
     {
-        var pool = stats.FindAll(s => s.available == null || s.available());
-        var result = new List<CardDraft.Card>();
-        if (pool.Count == 0) return result;
-        for (int i = pool.Count - 1; i > 0; i--) { int j = UnityEngine.Random.Range(0, i + 1); (pool[i], pool[j]) = (pool[j], pool[i]); }
+        var offers = new List<Func<int, CardDraft.Card>>();
+        foreach (var s in stats)
+            if (s.available == null || s.available()) { var stat = s; offers.Add(r => StatCard(stat, r)); }
+        if (PassiveItems.Instance) offers.AddRange(PassiveItems.Instance.UpgradeOffers());
 
+        var result = new List<CardDraft.Card>();
+        if (offers.Count == 0) return result;
+        for (int i = offers.Count - 1; i > 0; i--) { int j = UnityEngine.Random.Range(0, i + 1); (offers[i], offers[j]) = (offers[j], offers[i]); }
         for (int i = 0; i < 3; i++)
-        {
-            var s = pool[i % pool.Count]; // 후보가 3개보다 적으면 같은 능력치가 다른 희귀도로 나올 수 있음
-            int r = CardDraft.RollRarity();
-            float amount = s.baseAmount * CardDraft.RarityPower[r];
-            if (s.capAmount) amount = Mathf.Min(amount, 0.6f);
-            result.Add(new CardDraft.Card
-            {
-                badge = "능력치 강화", badgeColor = new Color(0.55f, 0.9f, 1f),
-                name = s.name, stat = s.stat, color = s.color, rarity = r,
-                amount = s.amountText(amount), desc = s.desc,
-                current = s.current(), preview = s.preview(amount),
-                footer = s.times > 0 ? $"지금까지 {s.times}번 강화" : "",
-                pick = () => { s.apply(amount); s.times++; }
-            });
-        }
+            result.Add(offers[i % offers.Count](CardDraft.RollRarity())); // 후보가 3개보다 적으면 같은 항목이 다른 희귀도로 나올 수 있음
         return result;
+    }
+
+    CardDraft.Card StatCard(Stat s, int r)
+    {
+        float amount = s.baseAmount * CardDraft.RarityPower[r];
+        if (s.capAmount) amount = Mathf.Min(amount, 0.6f);
+        return new CardDraft.Card
+        {
+            badge = "능력치 강화", badgeColor = new Color(0.55f, 0.9f, 1f),
+            name = s.name, stat = s.stat, color = s.color, rarity = r,
+            amount = s.amountText(amount), desc = s.desc,
+            current = s.current(), preview = s.preview(amount),
+            footer = s.times > 0 ? $"지금까지 {s.times}번 강화" : "",
+            pick = () => { s.apply(amount); s.times++; }
+        };
     }
 
     void Update()
@@ -158,5 +171,32 @@ public class LevelUpCards : MonoBehaviour
         float step = Mathf.Max(0.01f, sizeMult - 1f) / Mathf.Max(0.05f, growTime) * Time.deltaTime;
         shownSizeMult = Mathf.MoveTowards(shownSizeMult, sizeMult, Mathf.Max(step, 0.3f * Time.deltaTime));
         ctrl.SetModelScale(baseModelScale * shownSizeMult);
+    }
+
+    // ───────────── 자동 성장 (카드 끔) ─────────────
+    string growText; float growUntil;
+
+    void AutoGrow()
+    {
+        var parts = new List<string>();
+        if (hp && autoHp > 0f) { hp.AddMaxHP(autoHp); parts.Add($"HP +{autoHp:0}"); }
+        if (ctrl && autoSize > 0f && sizeMult < maxSizeMultiplier - 0.001f)
+        {
+            if (!sizeBaseSet) { baseModelScale = ctrl.ModelScale; sizeBaseSet = true; } // 성별 선택 후의 모델 크기 기준
+            sizeMult = Mathf.Min(sizeMult + autoSize, maxSizeMultiplier);
+            parts.Add($"크기 +{autoSize * 100f:0.#}%");
+        }
+        if (stomp && autoAttack > 0f) { stomp.attackPower += autoAttack; parts.Add($"공격력 +{autoAttack:0}"); }
+        growText = string.Join("   ·   ", parts);
+        growUntil = Time.time + 2.5f;
+    }
+
+    // 레벨업 알림(LevelSystem) 바로 아래에 오른 능력치 표시
+    void OnGUI()
+    {
+        if (GameStartMenu.InMenu || string.IsNullOrEmpty(growText) || Time.time >= growUntil) return;
+        float a = Mathf.Clamp01((growUntil - Time.time) / 0.5f);
+        float y = Screen.height - 26f - 14f - 26f;
+        CardDraft.ShadowLabel(new Rect(0, y, Screen.width, 24), growText, CardDraft.Style(17, FontStyle.Bold, TextAnchor.MiddleCenter), new Color(1f, 0.85f, 0.4f, a));
     }
 }

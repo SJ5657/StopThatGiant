@@ -377,9 +377,9 @@ MonoBehaviour:
   maxSpeed: 70
   panicRadius: 90
   fireInterval: 3.2
-  rocketSpeed: 120
+  rocketSpeed: 80
   damage: 40
-  homing: 1.3
+  homing: 0.55
   contactRadius: 10
 --- !u!1 &5881437396284414908
 GameObject:

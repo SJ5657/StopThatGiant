@@ -13,17 +13,28 @@ public class TankAI : MonoBehaviour
     public float maxRange = 220f;
 
     [Header("이동")]
-    public float moveSpeed = 60f;   // 거인 걷기 속도(약 56m/s)보다 빠르게
+    public float moveSpeed = 50f;
     public float turnSpeed = 240f;
     public float turretTurnSpeed = 90f;
 
     [Header("사격")]
     public float fireInterval = 2.6f;
-    public float shellSpeed = 180f;
+    public float shellSpeed = 120f;
     public float damage = 65f;
     public float spread = 7f;
 
     public bool IsDead { get; private set; }
+    [Tooltip("체력 (방귀 가스 등 지속 피해용. 거인에게 밟히면 체력과 관계없이 즉사)")] public float maxHP = 60f;
+    float hp = -1f;
+
+    // 지속 피해 (방귀 가스). 체력이 다 떨어지면 터짐
+    public void TakeDamage(float dmg)
+    {
+        if (IsDead) return;
+        if (hp < 0f) hp = maxHP;
+        hp -= dmg;
+        if (hp <= 0f) Crush();
+    }
     [Tooltip("시야가 이 시간 이상 막혀 있으면 자리 이동")] public float repositionAfter = 1.5f;
     float noLosTime;
     int buildingMask;
@@ -193,7 +204,9 @@ public class TankAI : MonoBehaviour
         Vector3 origin = MuzzlePos;
         if (!FindVisibleAim(g, origin, out Vector3 aim)) { nextFire = Time.time + 0.5f; return; } // 건물에 가려지면 쏘지 않음
         float t = Vector3.Distance(origin, aim) / shellSpeed;
-        aim += g.Velocity * t + Random.insideUnitSphere * spread * 0.5f;
+        // 방귀 가스(연막) 안에서는 거인 움직임을 못 읽고 조준이 크게 흔들림
+        bool smoke = GasCloud.InSmoke(transform.position);
+        aim += (smoke ? Vector3.zero : g.Velocity * t) + Random.insideUnitSphere * spread * (smoke ? 3f : 0.5f);
         Vector3 dir = (aim - origin).normalized;
         CombatFX.Muzzle(origin, dir, 3f);
         CombatFX.Spawn(CombatFX.Kind.Shell, origin, dir, shellSpeed, damage, 0f);

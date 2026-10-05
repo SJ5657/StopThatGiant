@@ -22,6 +22,11 @@ public class CityGenerator : MonoBehaviour
     [Range(0, 1)] public float parkChance = 0.07f;
     public int seed = 12345;
 
+    [Header("인도 (블록 가장자리, 도로와 맞닿은 부분)")]
+    public float walkwayWidth = 3.5f;  // 건물은 블록 가장자리에서 2 + setback 만큼 안쪽에 있으므로 그보다 좁게
+    public float walkwayHeight = 0.45f;
+    public Color walkwayColor = new Color(0.80f, 0.78f, 0.74f);
+
     [Header("머티리얼")]
     public Material buildingMat;
     public Material sidewalkMat;
@@ -48,12 +53,7 @@ public class CityGenerator : MonoBehaviour
     {
         Clear();
         rng = new System.Random(seed);
-        if (!cube)
-        {
-            var tmp = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            cube = tmp.GetComponent<MeshFilter>().sharedMesh;
-            if (Application.isPlaying) Destroy(tmp); else DestroyImmediate(tmp);
-        }
+        EnsureCube();
 
         float pitch = blockSize + roadWidth;
         float sizeX = blocksX * pitch + roadWidth;
@@ -81,6 +81,7 @@ public class CityGenerator : MonoBehaviour
 
             bool park = rng.NextDouble() < parkChance;
             Box("Sidewalk", block, bc + Vector3.up * sidewalkHeight / 2, new Vector3(blockSize, sidewalkHeight, blockSize), park ? parkMat : sidewalkMat, null);
+            AddWalkways(block, origin + new Vector3(x0, 0, z0));
             if (park) continue;
 
             // 도심일수록 높게
@@ -115,6 +116,46 @@ public class CityGenerator : MonoBehaviour
             }
         }
         Debug.Log($"[CityGenerator] {blocksX}x{blocksZ} blocks, {count} buildings, {sizeX:F0} x {sizeZ:F0} m");
+    }
+
+    // 이미 만들어진 도시에 인도만 추가 (건물은 그대로). 인스펙터 우클릭(⋮) 메뉴 → Add Walkways
+    [ContextMenu("Add Walkways")]
+    public void AddWalkwaysToExisting()
+    {
+        EnsureCube();
+        var blocksRoot = transform.Find("Blocks");
+        if (!blocksRoot) return;
+        float pitch = blockSize + roadWidth;
+        Vector3 origin = transform.position - new Vector3(blocksX * pitch + roadWidth, 0, blocksZ * pitch + roadWidth) * 0.5f;
+        for (int bx = 0; bx < blocksX; bx++)
+        for (int bz = 0; bz < blocksZ; bz++)
+        {
+            var block = blocksRoot.Find($"Block_{bx}_{bz}");
+            if (!block) continue;
+            for (int i = block.childCount - 1; i >= 0; i--)
+                if (block.GetChild(i).name == "Walkway") { var c = block.GetChild(i).gameObject; if (Application.isPlaying) Destroy(c); else DestroyImmediate(c); }
+            AddWalkways(block, origin + new Vector3(roadWidth + bx * pitch, 0, roadWidth + bz * pitch));
+        }
+    }
+
+    // 블록 네 변을 따라 인도 (min = 블록 모서리 월드 좌표)
+    void AddWalkways(Transform block, Vector3 min)
+    {
+        float w = walkwayWidth, s = blockSize, y = transform.position.y + walkwayHeight / 2;
+        var mpb = new MaterialPropertyBlock();
+        mpb.SetColor("_Color", walkwayColor);
+        Box("Walkway", block, new Vector3(min.x + s / 2, y, min.z + w / 2), new Vector3(s, walkwayHeight, w), sidewalkMat, mpb);
+        Box("Walkway", block, new Vector3(min.x + s / 2, y, min.z + s - w / 2), new Vector3(s, walkwayHeight, w), sidewalkMat, mpb);
+        Box("Walkway", block, new Vector3(min.x + w / 2, y, min.z + s / 2), new Vector3(w, walkwayHeight, s - 2 * w), sidewalkMat, mpb);
+        Box("Walkway", block, new Vector3(min.x + s - w / 2, y, min.z + s / 2), new Vector3(w, walkwayHeight, s - 2 * w), sidewalkMat, mpb);
+    }
+
+    void EnsureCube()
+    {
+        if (cube) return;
+        var tmp = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        cube = tmp.GetComponent<MeshFilter>().sharedMesh;
+        if (Application.isPlaying) Destroy(tmp); else DestroyImmediate(tmp);
     }
 
     void Split(Rect r, List<Rect> outLots, int depth)

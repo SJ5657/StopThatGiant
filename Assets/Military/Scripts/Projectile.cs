@@ -14,7 +14,7 @@ public class Projectile : MonoBehaviour
     {
         vel = velocity; damage = dmg; homing = homingRate; explodeSize = size; trail = tr;
         dieAt = Time.time + 7f;
-        homingOffset = Random.insideUnitSphere * 4f;
+        homingOffset = Random.insideUnitSphere * 10f; // 유도 목표를 몸통에서 이만큼 어긋나게 → 가끔 빗나감
     }
 
     void Update()

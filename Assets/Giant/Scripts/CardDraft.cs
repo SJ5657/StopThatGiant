@@ -165,7 +165,8 @@ public class CardDraft : MonoBehaviour
 
     static void DrawCard(Rect r, Card c, int index, float a, bool hover)
     {
-        Color rc = RarityColors[Mathf.Clamp(c.rarity, 0, RarityColors.Length - 1)];
+        bool noRarity = c.rarity < 0; // 등급 없는 카드 (새 패시브 아이템): 아이템 색으로 표시
+        Color rc = noRarity ? c.color : RarityColors[Mathf.Min(c.rarity, RarityColors.Length - 1)];
         // 전설은 테두리가 반짝임
         Color border = c.rarity == 4 ? Color.Lerp(rc, Color.white, Mathf.PingPong(Time.unscaledTime * 1.6f, 0.6f)) : rc;
         border.a = a * (hover ? 1f : 0.85f);
@@ -178,7 +179,7 @@ public class CardDraft : MonoBehaviour
         // 희귀도 띠
         float bandH = cw * 0.14f;
         Box(new Rect(r.x, r.y, r.width, bandH), new Color(rc.r * 0.55f, rc.g * 0.55f, rc.b * 0.55f, a));
-        ShadowLabel(new Rect(r.x, r.y, r.width, bandH), RarityNames[Mathf.Clamp(c.rarity, 0, RarityNames.Length - 1)],
+        ShadowLabel(new Rect(r.x, r.y, r.width, bandH), noRarity ? "패시브 아이템" : RarityNames[Mathf.Min(c.rarity, RarityNames.Length - 1)],
             Style(Mathf.RoundToInt(cw * 0.065f), FontStyle.Bold, TextAnchor.MiddleCenter), new Color(1, 1, 1, a));
 
         // 배지 (능력치 강화 / 새 아이템 / 아이템 강화)

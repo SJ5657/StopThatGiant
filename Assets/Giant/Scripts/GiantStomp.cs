@@ -86,6 +86,8 @@ public class GiantStomp : MonoBehaviour
         {
             var tank = hits[i] ? hits[i].GetComponentInParent<TankAI>() : null;
             if (tank) tank.Crush();
+            var police = hits[i] ? hits[i].GetComponentInParent<PoliceUnit>() : null;
+            if (police) police.Crush();
         }
     }
 
