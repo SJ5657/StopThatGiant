@@ -212,15 +212,14 @@ public class BuildingDestruction : MonoBehaviour
         foreach (Transform child in b.transform)
             if (child.gameObject.activeSelf && child.GetComponent<Collider>()) SpawnShards(child, hitPoint, push);
         SpawnShards(b.transform, hitPoint, push);
-        ExplosiveBuildings.OnBroken(b); // 빨간 건물이면 폭발
-        BoostBuildings.OnBroken(b, countIt); // 노란 건물이면 무한 달리기
-        HealBuildings.OnBroken(b, countIt); // 초록 건물이면 회복 영역
+        ExplosiveBuildings.OnBroken(b); // 공장이면 확률로 폭발
         b.SetActive(false);
         Destroy(b, 0.1f);
         if (countIt)
         {
             DestroyedCount++;
             ScoreManager.Add(ScoreManager.Instance ? ScoreManager.Instance.buildingPoints : 100);
+            Money.AddForBuilding(); // 건물을 부수면 돈 (상점에서 사용)
         }
         if (GiantCamera.Instance) GiantCamera.Instance.Shake(0.25f);
     }

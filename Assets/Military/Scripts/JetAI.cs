@@ -59,7 +59,7 @@ public class JetAI : MonoBehaviour
                 Vector3 to = gp - transform.position; to.y = 0;
                 steerTarget = gp; steerTarget.y = PassAltitude(g);
                 float ang = Vector3.Angle(flatFwd, to);
-                if (!g.IsDead && ang < 5f && to.magnitude > lockMinDistance && to.magnitude < lockMaxDistance) StartRun(g);
+                if (!g.IsDead && !GiantHome.GiantSafe && ang < 5f && to.magnitude > lockMinDistance && to.magnitude < lockMaxDistance) StartRun(g); // 거인의 집 안이면 폭격 안 함
                 else if (to.magnitude < lockMinDistance * 0.8f && Vector3.Dot(to, flatFwd) > 0) { state = State.Egress; stateUntil = Time.time + 3f; } // 너무 가까우면 지나쳐서 다시 진입
                 break;
             }

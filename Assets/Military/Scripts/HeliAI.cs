@@ -94,7 +94,7 @@ public class HeliAI : MonoBehaviour
             transform.rotation = Quaternion.Slerp(transform.rotation, yaw * Quaternion.Euler(pitch, 0, roll), dt * 3f);
         }
 
-        if (!g.IsDead && Time.time >= nextFire) Fire(g);
+        if (!g.IsDead && !GiantHome.GiantSafe && Time.time >= nextFire) Fire(g); // 거인의 집 안이면 공격 안 함
     }
 
     public void Explode()

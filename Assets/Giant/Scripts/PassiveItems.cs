@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 
 // 길가 아이템 + 패시브 아이템.
-// 거인 주변 도로 위에 아이템 상자가 낮은 확률로 계속 나타나고, 거인이 밟으면 아이템 카드 3장 중 1장을 고름.
+// 패시브 아이템은 거인의 집 상점(GiantHome)에서 돈으로 구매 (길가 아이템 상자는 roadsidePickups로 켤 때만).
 // 없는 아이템은 새로 장착(등급 없음), 이미 가진 아이템은 강화(희귀도 랜덤).
 // 패시브 아이템 = 특수 건물 등장 확률(거인 주변에 들어온 흰 건물마다 그 확률로 특수 건물로 바뀜)
 // 또는 거인의 식욕(시민 잡아먹기 활성화 + 먹을 때 HP 회복).
@@ -12,6 +12,7 @@ public class PassiveItems : MonoBehaviour
     public static PassiveItems Instance { get; private set; }
 
     [Header("길가 아이템")]
+    [Tooltip("길가에 아이템 상자가 나오게 할지 (끄면 패시브 아이템은 거인의 집 상점에서만 구매)")] public bool roadsidePickups = false;
     [Tooltip("동시에 놓여 있을 수 있는 아이템 수")] public int maxPickups = 2;
     [Tooltip("이 간격(초)마다 아이템이 생길지 확률을 굴림")] public float pickupInterval = 10f;
     [Tooltip("굴릴 때마다 아이템이 생길 확률")] [Range(0, 1)] public float pickupChance = 0.2f;
@@ -29,6 +30,11 @@ public class PassiveItems : MonoBehaviour
     [Header("시민 먹기 아이템 (거인의 식욕)")]
     [Tooltip("새로 얻었을 때 시민 한 명당 HP 회복량")] public float newEatHeal = 20f;
     [Tooltip("일반 등급 강화 1번으로 늘어나는 회복량 (희귀도가 높을수록 배로 늘어남)")] public float upgradeEatHeal = 10f;
+
+    [Header("상점 가격 (거인의 집)")]
+    [Tooltip("공장 아이템 첫 구매 가격")] public int factoryPrice = 150;
+    [Tooltip("거인의 식욕 첫 구매 가격")] public int eatPrice = 300;
+    [Tooltip("강화할 때마다 가격이 오르는 비율 (0.5 = 레벨마다 +50%)")] public float priceGrowth = 0.5f;
 
     class Item
     {
@@ -55,9 +61,7 @@ public class PassiveItems : MonoBehaviour
     {
         city = FindObjectOfType<CityGenerator>();
         ctrl = FindObjectOfType<GiantController>();
-        AddItem(FindObjectOfType<ExplosiveBuildings>(), "폭약 창고", "폭약", "빨간 건물이 생겨남.\n부수면 폭발해 주변까지 파괴.", new Color(1f, 0.35f, 0.3f));
-        AddItem(FindObjectOfType<BoostBuildings>(), "발전소", "발전", "노란 건물이 생겨남.\n부수면 스테미나 + 자동 질주.", new Color(1f, 0.85f, 0.2f));
-        AddItem(FindObjectOfType<HealBuildings>(), "구호소", "구호", "초록 건물이 생겨남.\n부수면 HP 회복 영역 생성.", new Color(0.35f, 0.9f, 0.45f));
+        AddItem(FindObjectOfType<ExplosiveBuildings>(), "공장", "공장", "공장이 더 자주 나타남.\n부수면 확률로 폭발해 주변까지 파괴.", new Color(1f, 0.35f, 0.3f));
         var eat = FindObjectOfType<GiantEat>();
         if (eat) items.Add(new Item { eat = eat, name = "거인의 식욕", icon = "식욕", desc = "시민을 잡아먹을 수 있게 됨.\n(없으면 밟기만 함)", color = new Color(1f, 0.5f, 0.6f) });
         nextPickupAt = Time.time + 3f;
@@ -93,7 +97,7 @@ public class PassiveItems : MonoBehaviour
             else if (d.sqrMagnitude > despawnDistance * despawnDistance) { Destroy(p.gameObject); pickups.RemoveAt(i); }
         }
         // 보유 아이템 수와 관계없이 낮은 확률로 계속 생김
-        if (items.Count > 0 && pickups.Count < maxPickups && Time.time >= nextPickupAt)
+        if (roadsidePickups && items.Count > 0 && pickups.Count < maxPickups && Time.time >= nextPickupAt)
         {
             nextPickupAt = Time.time + pickupInterval;
             if (Random.value < pickupChance && TryRoadPoint(gp, out Vector3 pos)) pickups.Add(CreatePickup(pos));
@@ -143,6 +147,49 @@ public class PassiveItems : MonoBehaviour
     }
 
     static string Pct(float p) => $"{p * 100f:0.##}%";
+
+    // ───────────── 상점 (거인의 집) ─────────────
+    public struct ShopEntry
+    {
+        public string name, desc, state, effect;
+        public Color color;
+        public int level, price;
+        public bool maxed;
+    }
+
+    public int ItemCount => items.Count;
+
+    int Price(Item it) => Mathf.RoundToInt((it.eat ? eatPrice : factoryPrice) * (1f + priceGrowth * it.level));
+    float BuyAmount(Item it) => it.eat ? (it.level == 0 ? newEatHeal : upgradeEatHeal) : (it.level == 0 ? newItemChance : upgradeChance);
+    bool Maxed(Item it) => !it.eat && it.chance >= maxChance - 0.0001f;
+
+    public ShopEntry GetEntry(int i)
+    {
+        var it = items[i];
+        float a = BuyAmount(it);
+        var e = new ShopEntry { name = it.name, desc = it.desc, color = it.color, level = it.level, price = Price(it), maxed = Maxed(it) };
+        if (it.eat)
+        {
+            e.state = it.level == 0 ? "미보유 (밟기만 함)" : $"Lv{it.level}  ·  먹을 때 HP +{it.heal:0}";
+            e.effect = it.level == 0 ? $"시민을 잡아먹을 수 있게 됨 (HP +{a:0})" : $"먹을 때 회복 +{a:0}";
+        }
+        else
+        {
+            e.state = it.level == 0 ? "미보유" : $"Lv{it.level}  ·  추가 등장 +{Pct(it.chance)}";
+            e.effect = e.maxed ? "최대" : $"{it.set.DisplayName} 추가 등장 확률 +{Pct(a)}";
+        }
+        return e;
+    }
+
+    // 돈을 내고 구매(첫 구매는 장착, 이후는 강화). 성공하면 true
+    public bool Buy(int i)
+    {
+        if (i < 0 || i >= items.Count) return false;
+        var it = items[i];
+        if (Maxed(it) || !Money.TrySpend(Price(it))) return false;
+        Equip(it, BuyAmount(it));
+        return true;
+    }
 
     CardDraft.Card NewItemCard(Item it)
     {

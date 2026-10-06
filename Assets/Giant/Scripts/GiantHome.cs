@@ -1,0 +1,288 @@
+using UnityEngine;
+
+// 거인의 집(상점): 도시 동쪽 바깥에 거인 크기의 집 + 담벽(도시 쪽에 대문) + 넓은 잔디 마당을 게임 시작 시 만들고,
+// 마당에 거인만 한 상인 NPC를 세움. NPC 가까이에서 E를 누르면 게임이 멈추고 상점 창이 열려 돈(Money)으로 패시브 아이템 구매.
+// 거인이 마당 안으로 들어올 수 있게 이동 범위를 열어줌(Allows). 집이 화면 밖이면 가장자리에 방향 표시.
+public class GiantHome : MonoBehaviour
+{
+    public static GiantHome Instance { get; private set; }
+    public static bool IsOpen => Instance != null && Instance.open;
+    // 거인이 집 마당 안에 있으면 안전지대: 적들이 공격하지 않고 피해도 없음
+    public static bool GiantSafe => Instance != null && Instance.giant && Instance.built && Instance.Allows(Instance.giant.transform.position);
+
+    [Header("모델")]
+    [Tooltip("거인 크기로 키울 집 모델")] public GameObject housePrefab;
+    [Tooltip("집 모델 크기 배율")] public float houseScale = 7f;
+    [Tooltip("상인 NPC (비우면 시민 캐릭터 중 하나)")] public GameObject npcPrefab;
+    [Tooltip("NPC 크기 배율 (시민과 같은 소인 크기)")] public float npcScale = 1.2f;
+    [Tooltip("게임 시작 시 거인을 집 마당에서 시작")] public bool spawnGiantHere = true;
+
+    [Header("마당 / 담벽 (m)")]
+    [Tooltip("도시 동쪽 끝에서 마당까지 거리")] public float gapFromCity = 80f;
+    public Vector2 yardSize = new Vector2(400f, 400f);
+    public float wallHeight = 16f;
+    public float wallThickness = 5f;
+    [Tooltip("도시 쪽 대문 폭")] public float gateWidth = 120f;
+    public Color wallColor = new Color(0.86f, 0.8f, 0.68f);
+
+    [Header("상점")]
+    [Tooltip("NPC와 이 거리 안이면 말을 걸 수 있음 (거인 크기 기준)")] public float talkRadius = 2.2f;
+
+    Rect yardRect;           // 마당 (XZ)
+    Transform npc, house;
+    Animator npcAnim;
+    GiantController giant;
+    bool open, canTalk, built;
+    float prevTimeScale = 1f;
+    CursorLockMode prevLock; bool prevVisible;
+    string message; float messageUntil;
+    Mesh cube;
+
+    void Awake() { Instance = this; }
+
+    void OnDestroy()
+    {
+        if (open) Time.timeScale = 1f;
+        if (Instance == this) Instance = null;
+    }
+
+    // 거인 이동 범위: 도시 밖이어도 마당 안이면 허용
+    public bool Allows(Vector3 p) => yardRect.Contains(new Vector2(p.x, p.z));
+
+    void Start()
+    {
+        giant = FindObjectOfType<GiantController>();
+        var city = FindObjectOfType<CityGenerator>();
+        if (!city) return;
+        var tmp = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        cube = tmp.GetComponent<MeshFilter>().sharedMesh;
+        Destroy(tmp);
+
+        float pitch = city.blockSize + city.roadWidth;
+        float halfX = (city.blocksX * pitch + city.roadWidth) * 0.5f;
+        Vector3 c = city.transform.position;
+        float x0 = c.x + halfX + gapFromCity, x1 = x0 + yardSize.x;
+        float z0 = c.z - yardSize.y * 0.5f, z1 = c.z + yardSize.y * 0.5f;
+        yardRect = Rect.MinMaxRect(x0 - wallThickness, z0, x1, z1);
+        float cx = (x0 + x1) * 0.5f;
+
+        var root = transform;
+        // 잔디 마당 (거인이 밟고 서는 바닥)
+        Box("Yard", root, new Vector3(cx, -0.45f, c.z), new Vector3(yardSize.x + 40f, 1f, yardSize.y + 40f), city.parkMat, null, true);
+
+        // 담벽: 서쪽(도시 쪽)은 가운데 대문을 비우고 양쪽으로
+        var mpb = new MaterialPropertyBlock(); mpb.SetColor("_Color", wallColor);
+        float wy = wallHeight * 0.5f, t = wallThickness;
+        float side = (yardSize.y - gateWidth) * 0.5f;
+        Box("Wall", root, new Vector3(x0, wy, z0 + side * 0.5f), new Vector3(t, wallHeight, side), city.buildingMat, mpb, true);
+        Box("Wall", root, new Vector3(x0, wy, z1 - side * 0.5f), new Vector3(t, wallHeight, side), city.buildingMat, mpb, true);
+        Box("Wall", root, new Vector3(x1, wy, c.z), new Vector3(t, wallHeight, yardSize.y), city.buildingMat, mpb, true);
+        Box("Wall", root, new Vector3(cx, wy, z0), new Vector3(yardSize.x, wallHeight, t), city.buildingMat, mpb, true);
+        Box("Wall", root, new Vector3(cx, wy, z1), new Vector3(yardSize.x, wallHeight, t), city.buildingMat, mpb, true);
+        // 대문 기둥
+        Box("GatePost", root, new Vector3(x0, wallHeight * 0.7f, c.z - gateWidth * 0.5f), new Vector3(t * 2f, wallHeight * 1.4f, t * 2f), city.buildingMat, mpb, true);
+        Box("GatePost", root, new Vector3(x0, wallHeight * 0.7f, c.z + gateWidth * 0.5f), new Vector3(t * 2f, wallHeight * 1.4f, t * 2f), city.buildingMat, mpb, true);
+
+        // 집: 마당 안쪽 끝에 정면이 도시(서쪽)를 보게
+        if (housePrefab)
+        {
+            var h = Instantiate(housePrefab, root);
+            h.name = "GiantHouse";
+            foreach (var col in h.GetComponentsInChildren<Collider>()) Destroy(col);
+            h.transform.rotation = Quaternion.Euler(0f, -90f, 0f); // 모델 정면(+Z) → 서쪽(-X)
+            h.transform.localScale = Vector3.one * houseScale;
+            h.transform.position = Vector3.zero;
+            var b = Bounds(h);
+            h.transform.position = new Vector3(x1 - t - 20f - b.size.x * 0.5f, 0f, c.z) - new Vector3(b.center.x, b.min.y, b.center.z);
+            b = Bounds(h);
+            var hc = new GameObject("HouseCollider"); hc.transform.SetParent(root, false); // 거인이 집을 통과하지 못하게
+            var bc = hc.AddComponent<BoxCollider>(); bc.center = b.center; bc.size = b.size;
+            house = h.transform;
+        }
+
+        // 상인 NPC: 마당 가운데, 대문(도시) 쪽을 보고 서 있음
+        var cm = FindObjectOfType<CivilianManager>();
+        var prefab = npcPrefab ? npcPrefab : (cm && cm.prefabs != null && cm.prefabs.Length > 0 ? cm.prefabs[0] : null);
+        if (prefab)
+        {
+            var n = Instantiate(prefab, root);
+            n.name = "ShopKeeper";
+            foreach (var col in n.GetComponentsInChildren<Collider>()) Destroy(col);
+            n.transform.rotation = Quaternion.LookRotation(Vector3.left);
+            n.transform.localScale = Vector3.one * npcScale; // 소인 (시민과 같은 크기)
+            n.transform.position = new Vector3(cx - yardSize.x * 0.1f, 0.05f, c.z + yardSize.y * 0.15f);
+            npcAnim = n.GetComponentInChildren<Animator>();
+            if (npcAnim && cm) { npcAnim.runtimeAnimatorController = cm.locomotion; npcAnim.applyRootMotion = false; }
+            npc = n.transform;
+        }
+
+        // 거인은 집 마당(대문 안쪽)에서 대문을 바라보며 시작
+        if (spawnGiantHere && giant)
+        {
+            var cc = giant.GetComponent<CharacterController>();
+            if (cc) cc.enabled = false;
+            giant.transform.SetPositionAndRotation(new Vector3(cx - yardSize.x * 0.1f, 0.1f, c.z - yardSize.y * 0.12f), Quaternion.LookRotation(Vector3.left));
+            if (cc) cc.enabled = true;
+        }
+        built = true;
+    }
+
+    static Bounds Bounds(GameObject go)
+    {
+        var rs = go.GetComponentsInChildren<Renderer>();
+        if (rs.Length == 0) return new Bounds(go.transform.position, Vector3.one);
+        Bounds b = rs[0].bounds; foreach (var r in rs) b.Encapsulate(r.bounds);
+        return b;
+    }
+
+    void Box(string name, Transform parent, Vector3 pos, Vector3 size, Material mat, MaterialPropertyBlock mpb, bool solid)
+    {
+        var go = new GameObject(name);
+        go.transform.SetParent(parent, false);
+        go.transform.position = pos;
+        go.transform.localScale = size;
+        go.AddComponent<MeshFilter>().sharedMesh = cube;
+        var mr = go.AddComponent<MeshRenderer>();
+        mr.sharedMaterial = mat;
+        if (mpb != null) mr.SetPropertyBlock(mpb);
+        if (solid) go.AddComponent<BoxCollider>();
+    }
+
+    // ───────────── 말 걸기 / 상점 열기 ─────────────
+    void Update()
+    {
+        if (!npc || !giant || GameStartMenu.InMenu) { canTalk = false; return; }
+        Vector3 d = giant.transform.position - npc.position; d.y = 0f;
+        canTalk = d.magnitude < talkRadius * giant.GameScale;
+        if (canTalk && d.sqrMagnitude > 1f) // 거인이 가까이 오면 그쪽을 봄
+            npc.rotation = Quaternion.RotateTowards(npc.rotation, Quaternion.LookRotation(d), 90f * Time.unscaledDeltaTime);
+        if (npcAnim) npcAnim.SetFloat("Speed", 0f);
+
+        if (open)
+        {
+            if (Input.GetKeyDown(KeyCode.E) || Input.GetKeyDown(KeyCode.Escape)) Close();
+            for (int k = 0; k < 9; k++) if (Input.GetKeyDown(KeyCode.Alpha1 + k)) TryBuy(k);
+        }
+        else if (canTalk && Input.GetKeyDown(KeyCode.E) && !CardDraft.IsOpen && Time.timeScale > 0f) Open();
+    }
+
+    void Open()
+    {
+        open = true;
+        prevTimeScale = Time.timeScale;
+        Time.timeScale = 0f;
+        prevLock = Cursor.lockState; prevVisible = Cursor.visible;
+        Cursor.lockState = CursorLockMode.None; Cursor.visible = true;
+        message = "어서 와! 부순 건물값으로 뭐든 팔지."; messageUntil = Time.unscaledTime + 3f;
+    }
+
+    void Close()
+    {
+        open = false;
+        Time.timeScale = prevTimeScale > 0f ? prevTimeScale : 1f;
+        Cursor.lockState = prevLock; Cursor.visible = prevVisible;
+    }
+
+    void TryBuy(int i)
+    {
+        var pi = PassiveItems.Instance;
+        if (!pi || i >= pi.ItemCount) return;
+        var e = pi.GetEntry(i);
+        if (e.maxed) { message = "그건 더 강화할 수 없어."; }
+        else if (pi.Buy(i)) { message = e.level == 0 ? $"{e.name} 구매 완료!" : $"{e.name} 강화 완료!"; }
+        else { message = "돈이 모자라. 건물을 더 부수고 와."; }
+        messageUntil = Time.unscaledTime + 2.5f;
+    }
+
+    // ───────────── 화면 ─────────────
+    void OnGUI()
+    {
+        if (GameStartMenu.InMenu || !npc) return;
+        var cam = Camera.main;
+        float W = Screen.width, H = Screen.height;
+
+        // NPC 머리 위 이름표
+        if (cam && !open)
+        {
+            Vector3 sp = cam.WorldToScreenPoint(npc.position + Vector3.up * Bounds(npc.gameObject).size.y * 1.05f);
+            if (sp.z > 0f && sp.x > 0 && sp.x < W && sp.y > 0 && sp.y < H)
+                CardDraft.ShadowLabel(new Rect(sp.x - 100, H - sp.y - 30, 200, 26), "상인", CardDraft.Style(16, FontStyle.Bold, TextAnchor.MiddleCenter), new Color(1f, 0.85f, 0.4f));
+            else DrawHomeArrow(cam, W, H);
+        }
+
+        if (canTalk && !open)
+            CardDraft.ShadowLabel(new Rect(0, H * 0.72f, W, 30), "[E] 상인에게 말 걸기 (상점)", CardDraft.Style(20, FontStyle.Bold, TextAnchor.MiddleCenter), new Color(1f, 0.9f, 0.5f));
+
+        if (open) DrawShop(W, H);
+    }
+
+    // 집이 화면 밖일 때 가장자리에 방향 + 거리
+    void DrawHomeArrow(Camera cam, float W, float H)
+    {
+        Vector3 sp = cam.WorldToScreenPoint(npc.position);
+        Vector2 dir = new Vector2(sp.x - W * 0.5f, sp.y - H * 0.5f);
+        if (sp.z < 0f) dir = -dir;
+        if (dir.sqrMagnitude < 1f) dir = Vector2.right;
+        dir.Normalize();
+        float m = 70f;
+        float k = Mathf.Min((W * 0.5f - m) / Mathf.Max(0.001f, Mathf.Abs(dir.x)), (H * 0.5f - m) / Mathf.Max(0.001f, Mathf.Abs(dir.y)));
+        Vector2 p = new Vector2(W * 0.5f, H * 0.5f) + dir * k;
+        float dist = giant ? Vector3.Distance(giant.transform.position, npc.position) : 0f;
+        string arrow = Mathf.Abs(dir.x) > Mathf.Abs(dir.y) ? (dir.x > 0 ? "▶" : "◀") : (dir.y > 0 ? "▲" : "▼");
+        CardDraft.ShadowLabel(new Rect(p.x - 90, H - p.y - 22, 180, 44), $"{arrow}\n거인의 집 {dist:0}m", CardDraft.Style(13, FontStyle.Bold, TextAnchor.MiddleCenter), new Color(1f, 0.85f, 0.4f));
+    }
+
+    void DrawShop(float W, float H)
+    {
+        GUI.depth = -150;
+        var pi = PassiveItems.Instance;
+        int n = pi ? pi.ItemCount : 0;
+        CardDraft.Box(new Rect(0, 0, W, H), new Color(0, 0, 0, 0.55f));
+        float pw = Mathf.Min(640f, W - 40f), rowH = 78f, ph = 150f + n * rowH + 40f;
+        var panel = new Rect((W - pw) * 0.5f, (H - ph) * 0.5f, pw, ph);
+        CardDraft.Box(new Rect(panel.x - 3, panel.y - 3, panel.width + 6, panel.height + 6), new Color(1f, 0.85f, 0.4f, 0.85f));
+        CardDraft.Box(panel, new Color(0.09f, 0.08f, 0.07f, 0.97f));
+
+        CardDraft.ShadowLabel(new Rect(panel.x, panel.y + 12, pw, 34), "거인의 상점", CardDraft.Style(26, FontStyle.Bold, TextAnchor.MiddleCenter), new Color(1f, 0.85f, 0.4f));
+        int money = Money.Instance ? Money.Instance.Amount : 0;
+        CardDraft.ShadowLabel(new Rect(panel.x, panel.y + 48, pw, 26), $"가진 돈  {money:N0}", CardDraft.Style(18, FontStyle.Bold, TextAnchor.MiddleCenter), Color.white);
+        string msg = Time.unscaledTime < messageUntil ? message : "클릭 또는 숫자키로 구매   ·   E / ESC 닫기";
+        GUI.color = new Color(1, 1, 1, 0.7f);
+        GUI.Label(new Rect(panel.x, panel.y + 76, pw, 22), msg, CardDraft.Style(13, FontStyle.Normal, TextAnchor.MiddleCenter));
+        GUI.color = Color.white;
+
+        var e = Event.current;
+        float y = panel.y + 108f;
+        for (int i = 0; i < n; i++)
+        {
+            var it = pi.GetEntry(i);
+            var r = new Rect(panel.x + 16, y, pw - 32, rowH - 8);
+            bool afford = money >= it.price && !it.maxed;
+            CardDraft.Box(r, new Color(0.15f, 0.14f, 0.13f, 1f));
+            CardDraft.Box(new Rect(r.x, r.y, 5, r.height), it.color);
+            GUI.color = new Color(1, 1, 1, 0.45f);
+            GUI.Label(new Rect(r.x + 10, r.y, 20, r.height), $"{i + 1}", CardDraft.Style(14, FontStyle.Bold, TextAnchor.MiddleCenter));
+            GUI.color = Color.white;
+            CardDraft.ShadowLabel(new Rect(r.x + 36, r.y + 6, 300, 24), it.name, CardDraft.Style(18, FontStyle.Bold, TextAnchor.MiddleLeft), it.color);
+            GUI.color = new Color(0.8f, 0.8f, 0.85f);
+            GUI.Label(new Rect(r.x + 36, r.y + 30, r.width - 180, 18), it.state, CardDraft.Style(12, FontStyle.Normal, TextAnchor.MiddleLeft));
+            GUI.color = new Color(0.55f, 0.9f, 1f);
+            GUI.Label(new Rect(r.x + 36, r.y + 48, r.width - 180, 18), it.effect, CardDraft.Style(12, FontStyle.Bold, TextAnchor.MiddleLeft));
+            GUI.color = Color.white;
+
+            var btn = new Rect(r.xMax - 132, r.y + 14, 120, r.height - 28);
+            bool hover = btn.Contains(e.mousePosition);
+            CardDraft.Box(btn, it.maxed ? new Color(0.3f, 0.3f, 0.32f) : afford ? (hover ? new Color(1f, 0.8f, 0.35f) : new Color(0.85f, 0.62f, 0.2f)) : new Color(0.35f, 0.25f, 0.2f));
+            GUI.color = afford || it.maxed ? Color.white : new Color(1, 1, 1, 0.5f);
+            GUI.Label(btn, it.maxed ? "MAX" : $"{(it.level == 0 ? "구매" : "강화")}  {it.price:N0}", CardDraft.Style(15, FontStyle.Bold, TextAnchor.MiddleCenter));
+            GUI.color = Color.white;
+            if (e.type == EventType.MouseDown && e.button == 0 && btn.Contains(e.mousePosition)) { e.Use(); TryBuy(i); }
+            y += rowH;
+        }
+
+        var close = new Rect(panel.x + pw * 0.5f - 70, panel.yMax - 40, 140, 30);
+        CardDraft.Box(close, close.Contains(e.mousePosition) ? new Color(0.5f, 0.5f, 0.55f) : new Color(0.35f, 0.35f, 0.4f));
+        GUI.Label(close, "닫기", CardDraft.Style(15, FontStyle.Bold, TextAnchor.MiddleCenter));
+        if (e.type == EventType.MouseDown && e.button == 0 && close.Contains(e.mousePosition)) { e.Use(); Close(); }
+    }
+}

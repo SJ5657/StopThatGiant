@@ -124,6 +124,7 @@ public class GiantHealth : MonoBehaviour
     public void TakeDamage(float dmg, bool shake)
     {
         if (IsDead) return;
+        if (GiantHome.GiantSafe) return; // 거인의 집 안에서는 날아오던 공격도 피해 없음
         dmg *= damageTakenMultiplier;
         HP = Mathf.Max(0, HP - dmg);
         hitFlash = shake ? 0.25f : Mathf.Max(hitFlash, 0.08f);

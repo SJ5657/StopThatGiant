@@ -200,6 +200,7 @@ public class TankAI : MonoBehaviour
 
     void Fire(GiantHealth g)
     {
+        if (GiantHome.GiantSafe) { nextFire = Time.time + 0.5f; return; } // 거인의 집 안이면 공격 안 함
         nextFire = Time.time + fireInterval * Random.Range(0.8f, 1.2f);
         Vector3 origin = MuzzlePos;
         if (!FindVisibleAim(g, origin, out Vector3 aim)) { nextFire = Time.time + 0.5f; return; } // 건물에 가려지면 쏘지 않음

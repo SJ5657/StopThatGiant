@@ -123,7 +123,7 @@ public class GiantController : MonoBehaviour
         cc.Move(vel * Time.deltaTime);
         Velocity = new Vector3(vel.x, 0, vel.z);
 
-        if (areaHalfExtent.x > 0 && areaHalfExtent.y > 0)
+        if (areaHalfExtent.x > 0 && areaHalfExtent.y > 0 && !(GiantHome.Instance && GiantHome.Instance.Allows(transform.position))) // 거인의 집 마당은 도시 밖이어도 허용
         {
             var p = transform.position;
             p.x = Mathf.Clamp(p.x, -areaHalfExtent.x, areaHalfExtent.x);

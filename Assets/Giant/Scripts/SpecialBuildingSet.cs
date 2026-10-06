@@ -1,19 +1,21 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-// 특수 건물(빨강·노랑·초록 등) 공통: 건물을 특정 색으로 칠하고 목록으로 관리.
-// 게임 시작 시 ratio 비율만큼 칠하고(기본 0 = 처음엔 흰 건물만), 패시브 아이템이 등장 확률(Chance)을 정하면
+// 특수 건물(공장 등) 공통: 흰 상자 건물을 지정한 건물 모델로 바꾸고(없으면 색만 칠함) 목록으로 관리.
+// 게임 시작 시 도시 전체에 ratio 비율만큼 깔고, 패시브 아이템이 추가 등장 확률(Chance)을 정하면
 // 거인 주변에 들어온 건물마다 그 확률로 이 건물로 바뀜.
 // 서로 다른 특수 건물끼리는 절대 겹치지 않음.
 public abstract class SpecialBuildingSet : MonoBehaviour
 {
     [Header("배치")]
-    [Tooltip("게임 시작 시 이 건물로 바꿀 비율 (0 = 처음엔 없고 레벨업 카드로만 등장)")] [Range(0, 0.2f)] public float ratio = 0f;
+    [Tooltip("게임 시작 시 도시 전체에서 이 건물로 바꿀 비율 (아이템 없이도 깔림, 0 = 아이템으로만 등장)")] [Range(0, 0.2f)] public float ratio = 0f;
+    [Tooltip("흰 상자 대신 세울 건물 모델 (비우면 상자를 색만 칠함)")] public GameObject modelPrefab;
+    [Tooltip("모델을 부지에 맞출 때 여유 비율 (1 = 부지에 꽉 차게)")] [Range(0.5f, 1.2f)] public float modelFit = 0.95f;
     [Tooltip("0이면 매번 다른 배치")] public int seed = 0;
     public Color color = Color.white;
     [Tooltip("등장 확률을 굴리는 거인 주변 반경 (m). 이 안에 처음 들어온 건물마다 한 번씩 굴림")] public float rollRadius = 350f;
 
-    // 화면 안내용 이름 (예: "빨간 건물")
+    // 화면 안내용 이름 (예: "공장")
     public abstract string DisplayName { get; }
 
     readonly HashSet<GameObject> members = new HashSet<GameObject>();
@@ -116,5 +118,48 @@ public abstract class SpecialBuildingSet : MonoBehaviour
     {
         members.Add(b);
         foreach (var r in b.GetComponentsInChildren<Renderer>()) r.SetPropertyBlock(mpb);
+        if (modelPrefab) PlaceModel(b);
     }
+
+    // 흰 상자는 숨기고(충돌·체력·파괴 판정은 상자 그대로) 그 자리에 건물 모델을 부지에 맞춰 세움.
+    // 모델은 상자의 자식이라 금 가며 기울기/무너지기를 그대로 따라가고 함께 사라짐. 정면(+Z)은 가까운 도로 쪽으로
+    void PlaceModel(GameObject b)
+    {
+        foreach (var r in b.GetComponentsInChildren<Renderer>()) r.enabled = false;
+
+        var t = b.transform;
+        Vector3 size = t.lossyScale;
+        // 블록 중심에서 멀어지는 방향(= 가까운 도로) 중 큰 축으로 정면을 돌림 (90도 단위라 부모의 비균일 스케일에도 찌그러지지 않음)
+        var walk = t.parent ? t.parent.Find("Sidewalk") : null;
+        Vector3 outward = walk ? t.position - walk.position : Vector3.forward; outward.y = 0f;
+        int yaw = Mathf.Abs(outward.x) > Mathf.Abs(outward.z) ? (outward.x > 0 ? 90 : 270) : (outward.z > 0 ? 0 : 180);
+        bool sideways = yaw == 90 || yaw == 270;
+
+        var go = Instantiate(modelPrefab);
+        go.name = modelPrefab.name;
+        foreach (var c in go.GetComponentsInChildren<Collider>()) Destroy(c);
+        var rs = go.GetComponentsInChildren<Renderer>();
+        if (rs.Length == 0) return;
+        Bounds mb = rs[0].bounds; foreach (var r in rs) mb.Encapsulate(r.bounds); // 원점·회전 0·크기 1 기준
+        Vector3 offset = mb.center - go.transform.position; offset.y = mb.min.y - go.transform.position.y;
+
+        // 비율 유지한 채 부지(상자 바닥면) 안에 맞춤
+        float footX = sideways ? mb.size.z : mb.size.x, footZ = sideways ? mb.size.x : mb.size.z;
+        float s = Mathf.Min(size.x / Mathf.Max(0.01f, footX), size.z / Mathf.Max(0.01f, footZ)) * modelFit;
+
+        Quaternion rot = Quaternion.Euler(0f, yaw, 0f);
+        Vector3 basePos = t.position - Vector3.up * size.y * 0.5f;
+        go.transform.SetParent(t, false);
+        go.transform.localRotation = rot;
+        go.transform.position = basePos - rot * offset * s;
+        // 부모(상자)의 스케일을 상쇄해서 실제 크기 s로 (90도 회전이면 X·Z 축이 바뀜)
+        go.transform.localScale = sideways
+            ? new Vector3(s / size.z, s / size.y, s / size.x)
+            : new Vector3(s / size.x, s / size.y, s / size.z);
+
+        OnModelPlaced(b, go, basePos + Vector3.up * mb.size.y * s);
+    }
+
+    // 모델을 세운 뒤 호출 (top = 모델 꼭대기 월드 위치). 표시 아이콘 등을 붙이는 용도
+    protected virtual void OnModelPlaced(GameObject box, GameObject model, Vector3 top) { }
 }
