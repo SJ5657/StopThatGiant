@@ -3,8 +3,9 @@ using UnityEngine;
 // 게임 시작 화면 → 성별(거인 모델) 선택 → 게임 시작.
 // 메뉴 동안에는 게임을 멈추고(Time.timeScale = 0) 게임 HUD를 숨기며, 배경에 거인을 보여주면서 카메라가 천천히 흔들린다.
 // 성별 카드에 마우스를 올리면 배경의 거인이 그 모델로 바뀌어 미리보기됨. 성별을 고른 뒤에만 '게임 시작'이 활성화.
-// 시작 화면: 게임 시작(HP 0이면 패배) / 무한모드(HP 0이 되어도 죽지 않음) / 게임 종료.
+// 시작 화면: 이어하기(세이브가 있을 때, SaveGame) / 게임 시작(HP 0이면 패배) / 무한모드(HP 0이 되어도 죽지 않음) / 게임 종료.
 // 사망 후 R로 재시작하면 시작 화면 없이 같은 성별·같은 모드로 바로 시작.
+// 게임 중 ESC: 게임을 멈추고 일시정지 메뉴(계속하기 / 시작 화면으로 / 게임 종료).
 // [ExecuteAlways]: 재생 전(편집 모드)에도 Game 창에 시작 화면을 미리보기로 그림 — 화면 그리기와 카메라 배치만 하고,
 // 모델 교체·시간 정지·입력·버튼 동작 같은 게임 로직은 재생 중에만 실행.
 [ExecuteAlways]
@@ -48,17 +49,23 @@ public class GameStartMenu : MonoBehaviour
     static bool lastInfinite;   // 재시작 시 같은 모드로
     // 무한모드: HP가 0이 되어도 죽지 않음 (시작 화면의 '무한모드' 버튼으로 시작). 일반 '게임 시작'은 HP 0이면 패배
     public static bool InfiniteMode { get; private set; }
+    // 지금 고른 성별 (세이브용)
+    public static int CurrentChoice => Instance != null && Instance.selected >= 0 ? Instance.selected : Mathf.Max(0, lastChoice);
     bool pendingInfinite; // 시작 화면에서 고른 모드 (성별 선택 후 시작할 때 확정)
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     static void ResetStatics() { lastChoice = -1; lastInfinite = false; InfiniteMode = false; }
 
     float referenceScale = 1f; // 첫 번째(여자) 모델 크기 = 게임 기준 크기
 
+    // 일시정지 메뉴 (게임 중 ESC): 계속하기 / 시작 화면으로 / 게임 종료
+    public static bool Paused => Instance != null && Instance.paused;
+    bool paused;
+    float pausePrevScale = 1f;
+
     void Awake()
     {
         if (!Application.isPlaying) return; // 편집 모드: 미리보기만
         Instance = this;
-        if (options != null && options.Length > 0 && options[0].model) referenceScale = options[0].model.transform.localScale.y;
         if (!giant) giant = FindObjectOfType<GiantController>();
         if (!giantCamera) giantCamera = FindObjectOfType<GiantCamera>();
         if (options == null || options.Length == 0) { state = State.Playing; return; }
@@ -79,6 +86,7 @@ public class GameStartMenu : MonoBehaviour
             SetActiveModel(0);
         }
         stateAt = Time.unscaledTime;
+        if (state == State.Title) saveInfo = SaveGame.Peek();
     }
 
     void Start()
@@ -86,6 +94,8 @@ public class GameStartMenu : MonoBehaviour
         if (!Application.isPlaying) return;
         started = true;
         if (options == null || options.Length == 0) return;
+        // 기준 크기는 모든 Awake 뒤에 잼 (GiantController가 Awake에서 시작 크기 배율을 적용함)
+        if (options[0].model) referenceScale = options[0].model.transform.localScale.y;
         if (state == State.Playing) FinalizeChoice();
         else { Rebind(previewing); SetAnimUnscaled(true); }
     }
@@ -95,7 +105,7 @@ public class GameStartMenu : MonoBehaviour
         if (!Application.isPlaying) return;
         RestoreSpringBones();
         if (Instance != this) return;
-        if (InMenu) Time.timeScale = 1f;
+        if (InMenu || paused) Time.timeScale = 1f;
         Instance = null;
     }
 
@@ -140,7 +150,18 @@ public class GameStartMenu : MonoBehaviour
 
     // ───────────── 흐름 ─────────────
     void GoSelect() { state = State.Select; stateAt = Time.unscaledTime; }
-    void GoTitle() { state = State.Title; selected = -1; stateAt = Time.unscaledTime; }
+    void GoTitle() { state = State.Title; selected = -1; stateAt = Time.unscaledTime; saveInfo = SaveGame.Peek(); }
+
+    // 이어하기: 저장된 세이브의 요약 (시작 화면 버튼에 표시)
+    SaveGame.Data saveInfo;
+
+    // 시작 화면 없이 이 성별·모드로 씬을 다시 불러옴 (세이브 이어하기)
+    public static void RestartWith(int choice, bool infinite)
+    {
+        lastChoice = choice; lastInfinite = infinite;
+        Time.timeScale = 1f;
+        UnityEngine.SceneManagement.SceneManager.LoadScene(UnityEngine.SceneManagement.SceneManager.GetActiveScene().buildIndex);
+    }
     void Choose(int i) { if (i >= 0 && i < options.Length) selected = i; }
 
     void StartGame()
@@ -165,9 +186,41 @@ public class GameStartMenu : MonoBehaviour
 #endif
     }
 
+    // ───────────── 일시정지 ─────────────
+    void UpdatePause()
+    {
+        if (!Input.GetKeyDown(KeyCode.Escape)) return;
+        if (paused) { Resume(); return; }
+        // 상점·카드 선택 중에는 ESC가 그 창을 닫는 데 쓰이므로 열지 않음 (이번 프레임에 상점이 닫힌 경우 포함)
+        if (GiantHome.IsOpen || GiantHome.ClosedFrame == Time.frameCount || CardDraft.IsOpen) return;
+        if (GiantHealth.Instance && GiantHealth.Instance.IsDead) return;
+        paused = true;
+        stateAt = Time.unscaledTime;
+        pausePrevScale = Time.timeScale > 0f ? Time.timeScale : 1f;
+        Time.timeScale = 0f;
+        Cursor.lockState = CursorLockMode.None; Cursor.visible = true;
+    }
+
+    void Resume()
+    {
+        paused = false;
+        Time.timeScale = pausePrevScale;
+        Cursor.lockState = CursorLockMode.Locked; Cursor.visible = false;
+    }
+
+    // 시작 화면으로: 씬을 다시 불러오되 '같은 성별로 바로 시작'을 지워서 시작 화면부터
+    void ReturnToTitle()
+    {
+        paused = false;
+        lastChoice = -1; lastInfinite = false; InfiniteMode = false;
+        Time.timeScale = 1f;
+        UnityEngine.SceneManagement.SceneManager.LoadScene(UnityEngine.SceneManagement.SceneManager.GetActiveScene().buildIndex);
+    }
+
     void Update()
     {
-        if (!Application.isPlaying || !InMenu) return;
+        if (!Application.isPlaying) return;
+        if (!InMenu) { UpdatePause(); return; }
         Cursor.lockState = CursorLockMode.None; Cursor.visible = true;
         if (Time.timeScale != 0f) Time.timeScale = 0f;
         if (Time.unscaledTime - stateAt < 0.2f) return;
@@ -269,10 +322,15 @@ public class GameStartMenu : MonoBehaviour
     // ───────────── 화면 ─────────────
     void OnGUI()
     {
-        if (Application.isPlaying && !InMenu) return; // 편집 모드에선 항상 시작 화면 미리보기
         GUI.depth = -200;
         float W = Screen.width, H = Screen.height;
         float fade = Mathf.Clamp01((Time.unscaledTime - stateAt) / 0.35f);
+        if (Application.isPlaying && !InMenu) // 편집 모드에선 항상 시작 화면 미리보기
+        {
+            if (paused) DrawPause(W, H, fade);
+            GUI.color = Color.white;
+            return;
+        }
         if (state == State.Title) DrawTitle(W, H, fade);
         else DrawSelect(W, H, fade);
         GUI.color = Color.white;
@@ -296,12 +354,36 @@ public class GameStartMenu : MonoBehaviour
             Style(Mathf.RoundToInt(H * 0.028f), FontStyle.Bold, TextAnchor.MiddleLeft), new Color(1f, 1f, 1f, 0.9f * fade));
 
         float bw = Mathf.Clamp(W * 0.22f, 240f, 340f), bh = Mathf.Clamp(H * 0.075f, 48f, 72f);
-        if (MenuButton(new Rect(x, H * 0.5f, bw, bh), "게임 시작", new Color(1f, 0.55f, 0.15f), true, fade)) { pendingInfinite = false; GoSelect(); return; }
-        if (MenuButton(new Rect(x, H * 0.5f + bh * 1.3f, bw, bh), "무한모드", new Color(0.55f, 0.4f, 1f), true, fade)) { pendingInfinite = true; GoSelect(); return; }
-        if (MenuButton(new Rect(x, H * 0.5f + bh * 2.6f, bw, bh), "게임 종료", new Color(0.42f, 0.45f, 0.52f), true, fade)) { Quit(); return; }
+        float y = H * 0.5f;
+        // 세이브가 있으면 맨 위에 '이어하기' (거인의 집 상점에서 저장)
+        if (Application.isPlaying && saveInfo != null)
+        {
+            if (MenuButton(new Rect(x, y, bw, bh), "이어하기", new Color(0.3f, 0.75f, 0.45f), true, fade)) { SaveGame.Continue(); return; }
+            string mode = saveInfo.infinite ? "무한모드  ·  " : "";
+            ShadowLabel(new Rect(x + bw + 16, y, W * 0.4f, bh), $"{mode}LV {saveInfo.level}  ·  점수 {saveInfo.score:N0}\n<size=12>{saveInfo.savedAt} 저장</size>",
+                Style(15, FontStyle.Bold, TextAnchor.MiddleLeft), new Color(1f, 1f, 1f, 0.85f * fade));
+            y += bh * 1.3f;
+        }
+        if (MenuButton(new Rect(x, y, bw, bh), "게임 시작", new Color(1f, 0.55f, 0.15f), true, fade)) { pendingInfinite = false; GoSelect(); return; }
+        if (MenuButton(new Rect(x, y + bh * 1.3f, bw, bh), "무한모드", new Color(0.55f, 0.4f, 1f), true, fade)) { pendingInfinite = true; GoSelect(); return; }
+        if (MenuButton(new Rect(x, y + bh * 2.6f, bw, bh), "게임 종료", new Color(0.42f, 0.45f, 0.52f), true, fade)) { Quit(); return; }
 
         ShadowLabel(new Rect(x, H - 50, W * 0.5f, 30), "Enter : 게임 시작",
             Style(14, FontStyle.Normal, TextAnchor.MiddleLeft), new Color(1, 1, 1, 0.6f * fade));
+    }
+
+    void DrawPause(float W, float H, float fade)
+    {
+        Box(new Rect(0, 0, W, H), new Color(0, 0, 0, 0.6f * fade));
+        ShadowLabel(new Rect(0, H * 0.25f, W, H * 0.1f), "일시정지",
+            Style(Mathf.RoundToInt(H * 0.07f), FontStyle.Bold, TextAnchor.MiddleCenter), new Color(1f, 0.82f, 0.28f, fade));
+        float bw = Mathf.Clamp(W * 0.22f, 240f, 340f), bh = Mathf.Clamp(H * 0.075f, 48f, 72f);
+        float x = W * 0.5f - bw * 0.5f, y = H * 0.42f;
+        if (MenuButton(new Rect(x, y, bw, bh), "계속하기", new Color(1f, 0.55f, 0.15f), true, fade)) { Resume(); return; }
+        if (MenuButton(new Rect(x, y + bh * 1.3f, bw, bh), "시작 화면으로", new Color(0.55f, 0.4f, 1f), true, fade)) { ReturnToTitle(); return; }
+        if (MenuButton(new Rect(x, y + bh * 2.6f, bw, bh), "게임 종료", new Color(0.42f, 0.45f, 0.52f), true, fade)) { Quit(); return; }
+        ShadowLabel(new Rect(0, y + bh * 3.9f, W, 30), "ESC : 계속하기",
+            Style(14, FontStyle.Normal, TextAnchor.MiddleCenter), new Color(1, 1, 1, 0.6f * fade));
     }
 
     void DrawSelect(float W, float H, float fade)

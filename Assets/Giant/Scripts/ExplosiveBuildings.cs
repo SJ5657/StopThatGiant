@@ -10,10 +10,14 @@ public class ExplosiveBuildings : SpecialBuildingSet
     public static ExplosiveBuildings Instance { get; private set; }
     public override string DisplayName => "공장";
 
+    [Header("크기")]
+    [Tooltip("공장 크기 배율 (1 = 일반 건물 부지에 맞춤). 커진 자리에 겹치는 일반 건물은 숨겨짐")] [Range(1f, 3f)] public float sizeMultiplier = 1.8f;
+    protected override float ModelScale => sizeMultiplier;
+
     [Header("폭발")]
     [Tooltip("무너질 때 폭발할 확률 (1 = 무조건)")] [Range(0, 1)] public float explodeChance = 1f;
-    public float blastRadius = 45f;
-    public float explosionSize = 35f;
+    public float blastRadius = 65f;
+    public float explosionSize = 45f;
     [Tooltip("무너진 뒤 폭발까지 걸리는 시간 (연쇄 폭발 간격)")] public float delay = 0.2f;
     [Tooltip("폭발로 부서지는 건물의 파편 양 배율")] [Range(0, 1)] public float shardMultiplier = 0.35f;
 

@@ -4,10 +4,10 @@ using UnityEngine;
 // 0이 되면 '지침' 상태 → 일정량(recoverThreshold) 회복될 때까지 달릴 수 없고 걷는 속도도 약간 느려짐.
 public class GiantStamina : MonoBehaviour
 {
-    public float maxStamina = 100f;
-    [Tooltip("달릴 때 초당 소모량")] public float runDrain = 32f;
-    [Tooltip("걸을 때 초당 회복량")] public float walkRegen = 8f;
-    [Tooltip("멈춰 있을 때 초당 회복량")] public float idleRegen = 20f;
+    public float maxStamina = 200f;
+    [Tooltip("달릴 때 초당 소모량")] public float runDrain = 25f;
+    [Tooltip("걸을 때 초당 회복량")] public float walkRegen = 10f;
+    [Tooltip("멈춰 있을 때 초당 회복량")] public float idleRegen = 25f;
     [Tooltip("달리기를 멈춘 뒤 회복이 시작되기까지 대기 시간(초)")] public float regenDelay = 0.8f;
     [Tooltip("지친 뒤 이 값까지 회복해야 다시 달릴 수 있음")] public float recoverThreshold = 35f;
     [Tooltip("지친 상태의 걷기 속도 배율")] public float exhaustedSpeedMultiplier = 0.6f;

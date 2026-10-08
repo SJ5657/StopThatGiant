@@ -1,25 +1,29 @@
 using UnityEngine;
 
 // 거인의 집(상점): 도시 동쪽 바깥에 거인 크기의 집 + 담벽(도시 쪽에 대문) + 넓은 잔디 마당을 게임 시작 시 만들고,
-// 마당에 거인만 한 상인 NPC를 세움. NPC 가까이에서 E를 누르면 게임이 멈추고 상점 창이 열려 돈(Money)으로 패시브 아이템 구매.
+// 마당에 거인만 한 상인 NPC를 세움. NPC 가까이에서 E를 누르면 게임이 멈추고 상점 창이 열려 돈(Money)으로 패시브 아이템·HP 회복약 구매.
 // 거인이 마당 안으로 들어올 수 있게 이동 범위를 열어줌(Allows). 집이 화면 밖이면 가장자리에 방향 표시.
+// 집 앞에서 E(또는 상점의 '저장하기'·S)로 게임을 저장 → 시작 화면 '이어하기'로 계속 (SaveGame).
 public class GiantHome : MonoBehaviour
 {
     public static GiantHome Instance { get; private set; }
     public static bool IsOpen => Instance != null && Instance.open;
-    // 거인이 집 마당 안에 있으면 안전지대: 적들이 공격하지 않고 피해도 없음
+    // 상점이 닫힌 프레임 (ESC로 닫을 때 같은 프레임에 일시정지 메뉴가 열리지 않게)
+    public static int ClosedFrame { get; private set; } = -1;
+    // 거인이 집 마당 안에 있으면 안전지대: 피해 없음 + 적들은 해산(MilitarySpawner)
     public static bool GiantSafe => Instance != null && Instance.giant && Instance.built && Instance.Allows(Instance.giant.transform.position);
 
     [Header("모델")]
     [Tooltip("거인 크기로 키울 집 모델")] public GameObject housePrefab;
-    [Tooltip("집 모델 크기 배율")] public float houseScale = 7f;
+    [Tooltip("집 크기 (거인 기준). 1 = 사람에게 맞는 집을 거인 크기로 키운 크기")] public float houseSizeRatio = 1f;
     [Tooltip("상인 NPC (비우면 시민 캐릭터 중 하나)")] public GameObject npcPrefab;
     [Tooltip("NPC 크기 배율 (시민과 같은 소인 크기)")] public float npcScale = 1.2f;
     [Tooltip("게임 시작 시 거인을 집 마당에서 시작")] public bool spawnGiantHere = true;
 
     [Header("마당 / 담벽 (m)")]
     [Tooltip("도시 동쪽 끝에서 마당까지 거리")] public float gapFromCity = 80f;
-    public Vector2 yardSize = new Vector2(400f, 400f);
+    [Tooltip("최소 마당 크기 (집이 크면 집에 맞춰 넓어짐)")] public Vector2 yardSize = new Vector2(400f, 400f);
+    [Tooltip("대문에서 집 앞까지 앞마당 깊이 (상인·거인 시작 위치)")] public float frontYard = 260f;
     public float wallHeight = 16f;
     public float wallThickness = 5f;
     [Tooltip("도시 쪽 대문 폭")] public float gateWidth = 120f;
@@ -27,12 +31,19 @@ public class GiantHome : MonoBehaviour
 
     [Header("상점")]
     [Tooltip("NPC와 이 거리 안이면 말을 걸 수 있음 (거인 크기 기준)")] public float talkRadius = 2.2f;
+    [Tooltip("HP 회복약 가격 (여러 번 살 수 있고 가격 고정)")] public int potionPrice = 100;
+    [Tooltip("회복약 하나로 회복하는 양 (최대 HP 대비, 0.35 = 35%)")] [Range(0f, 1f)] public float potionHealRatio = 0.35f;
+    static readonly Color PotionColor = new Color(0.4f, 1f, 0.5f);
+
+    [Header("저장")]
+    [Tooltip("집 앞(현관)에서 이 거리 안이면 E로 저장 (거인 크기 기준)")] public float saveRadius = 2.5f;
 
     Rect yardRect;           // 마당 (XZ)
     Transform npc, house;
+    Vector3 doorPos;         // 집 정면 가운데 (도시 쪽 벽)
     Animator npcAnim;
     GiantController giant;
-    bool open, canTalk, built;
+    bool open, canTalk, canSave, built;
     float prevTimeScale = 1f;
     CursorLockMode prevLock; bool prevVisible;
     string message; float messageUntil;
@@ -61,43 +72,61 @@ public class GiantHome : MonoBehaviour
         float pitch = city.blockSize + city.roadWidth;
         float halfX = (city.blocksX * pitch + city.roadWidth) * 0.5f;
         Vector3 c = city.transform.position;
-        float x0 = c.x + halfX + gapFromCity, x1 = x0 + yardSize.x;
-        float z0 = c.z - yardSize.y * 0.5f, z1 = c.z + yardSize.y * 0.5f;
+        var root = transform;
+        float t = wallThickness;
+
+        // 집: 사람 집 모델을 거인 크기로 (거인 크기 = 사람의 GameScale배). 마당 크기를 정하려고 먼저 만들어서 잼
+        GameObject h = null; Bounds hb = default;
+        if (housePrefab)
+        {
+            float gs = giant ? giant.GameScale : 25f;
+            h = Instantiate(housePrefab, root);
+            h.name = "GiantHouse";
+            foreach (var col in h.GetComponentsInChildren<Collider>()) Destroy(col);
+            h.transform.rotation = Quaternion.Euler(0f, -90f, 0f); // 모델 정면(+Z) → 서쪽(-X)
+            h.transform.localScale = Vector3.one * gs * houseSizeRatio;
+            h.transform.position = Vector3.zero;
+            hb = Bounds(h);
+        }
+
+        // 마당: 앞마당 + 집 + 뒤쪽 여유가 들어가도록 (최소 yardSize)
+        Vector2 yard = yardSize;
+        if (h)
+        {
+            yard.x = Mathf.Max(yard.x, frontYard + hb.size.x + t + 30f);
+            yard.y = Mathf.Max(yard.y, hb.size.z + 160f);
+        }
+        float x0 = c.x + halfX + gapFromCity, x1 = x0 + yard.x;
+        float z0 = c.z - yard.y * 0.5f, z1 = c.z + yard.y * 0.5f;
         yardRect = Rect.MinMaxRect(x0 - wallThickness, z0, x1, z1);
         float cx = (x0 + x1) * 0.5f;
+        float fx = x0 + Mathf.Min(frontYard, yard.x * 0.5f) * 0.5f; // 앞마당 가운데 (상인·거인 시작 위치)
 
-        var root = transform;
         // 잔디 마당 (거인이 밟고 서는 바닥)
-        Box("Yard", root, new Vector3(cx, -0.45f, c.z), new Vector3(yardSize.x + 40f, 1f, yardSize.y + 40f), city.parkMat, null, true);
+        Box("Yard", root, new Vector3(cx, -0.45f, c.z), new Vector3(yard.x + 40f, 1f, yard.y + 40f), city.parkMat, null, true);
 
         // 담벽: 서쪽(도시 쪽)은 가운데 대문을 비우고 양쪽으로
         var mpb = new MaterialPropertyBlock(); mpb.SetColor("_Color", wallColor);
-        float wy = wallHeight * 0.5f, t = wallThickness;
-        float side = (yardSize.y - gateWidth) * 0.5f;
+        float wy = wallHeight * 0.5f;
+        float side = (yard.y - gateWidth) * 0.5f;
         Box("Wall", root, new Vector3(x0, wy, z0 + side * 0.5f), new Vector3(t, wallHeight, side), city.buildingMat, mpb, true);
         Box("Wall", root, new Vector3(x0, wy, z1 - side * 0.5f), new Vector3(t, wallHeight, side), city.buildingMat, mpb, true);
-        Box("Wall", root, new Vector3(x1, wy, c.z), new Vector3(t, wallHeight, yardSize.y), city.buildingMat, mpb, true);
-        Box("Wall", root, new Vector3(cx, wy, z0), new Vector3(yardSize.x, wallHeight, t), city.buildingMat, mpb, true);
-        Box("Wall", root, new Vector3(cx, wy, z1), new Vector3(yardSize.x, wallHeight, t), city.buildingMat, mpb, true);
+        Box("Wall", root, new Vector3(x1, wy, c.z), new Vector3(t, wallHeight, yard.y), city.buildingMat, mpb, true);
+        Box("Wall", root, new Vector3(cx, wy, z0), new Vector3(yard.x, wallHeight, t), city.buildingMat, mpb, true);
+        Box("Wall", root, new Vector3(cx, wy, z1), new Vector3(yard.x, wallHeight, t), city.buildingMat, mpb, true);
         // 대문 기둥
         Box("GatePost", root, new Vector3(x0, wallHeight * 0.7f, c.z - gateWidth * 0.5f), new Vector3(t * 2f, wallHeight * 1.4f, t * 2f), city.buildingMat, mpb, true);
         Box("GatePost", root, new Vector3(x0, wallHeight * 0.7f, c.z + gateWidth * 0.5f), new Vector3(t * 2f, wallHeight * 1.4f, t * 2f), city.buildingMat, mpb, true);
 
         // 집: 마당 안쪽 끝에 정면이 도시(서쪽)를 보게
-        if (housePrefab)
+        if (h)
         {
-            var h = Instantiate(housePrefab, root);
-            h.name = "GiantHouse";
-            foreach (var col in h.GetComponentsInChildren<Collider>()) Destroy(col);
-            h.transform.rotation = Quaternion.Euler(0f, -90f, 0f); // 모델 정면(+Z) → 서쪽(-X)
-            h.transform.localScale = Vector3.one * houseScale;
-            h.transform.position = Vector3.zero;
-            var b = Bounds(h);
-            h.transform.position = new Vector3(x1 - t - 20f - b.size.x * 0.5f, 0f, c.z) - new Vector3(b.center.x, b.min.y, b.center.z);
-            b = Bounds(h);
+            h.transform.position = new Vector3(x1 - t - 20f - hb.size.x * 0.5f, 0f, c.z) - new Vector3(hb.center.x, hb.min.y, hb.center.z);
+            hb = Bounds(h);
             var hc = new GameObject("HouseCollider"); hc.transform.SetParent(root, false); // 거인이 집을 통과하지 못하게
-            var bc = hc.AddComponent<BoxCollider>(); bc.center = b.center; bc.size = b.size;
+            var bc = hc.AddComponent<BoxCollider>(); bc.center = hb.center; bc.size = hb.size;
             house = h.transform;
+            doorPos = new Vector3(hb.min.x, 0f, hb.center.z);
         }
 
         // 상인 NPC: 마당 가운데, 대문(도시) 쪽을 보고 서 있음
@@ -110,7 +139,7 @@ public class GiantHome : MonoBehaviour
             foreach (var col in n.GetComponentsInChildren<Collider>()) Destroy(col);
             n.transform.rotation = Quaternion.LookRotation(Vector3.left);
             n.transform.localScale = Vector3.one * npcScale; // 소인 (시민과 같은 크기)
-            n.transform.position = new Vector3(cx - yardSize.x * 0.1f, 0.05f, c.z + yardSize.y * 0.15f);
+            n.transform.position = new Vector3(fx, 0.05f, c.z + 60f);
             npcAnim = n.GetComponentInChildren<Animator>();
             if (npcAnim && cm) { npcAnim.runtimeAnimatorController = cm.locomotion; npcAnim.applyRootMotion = false; }
             npc = n.transform;
@@ -121,7 +150,7 @@ public class GiantHome : MonoBehaviour
         {
             var cc = giant.GetComponent<CharacterController>();
             if (cc) cc.enabled = false;
-            giant.transform.SetPositionAndRotation(new Vector3(cx - yardSize.x * 0.1f, 0.1f, c.z - yardSize.y * 0.12f), Quaternion.LookRotation(Vector3.left));
+            giant.transform.SetPositionAndRotation(new Vector3(fx, 0.1f, c.z - 50f), Quaternion.LookRotation(Vector3.left));
             if (cc) cc.enabled = true;
         }
         built = true;
@@ -151,9 +180,13 @@ public class GiantHome : MonoBehaviour
     // ───────────── 말 걸기 / 상점 열기 ─────────────
     void Update()
     {
-        if (!npc || !giant || GameStartMenu.InMenu) { canTalk = false; return; }
+        if (!npc || !giant || GameStartMenu.InMenu) { canTalk = canSave = false; return; }
         Vector3 d = giant.transform.position - npc.position; d.y = 0f;
         canTalk = d.magnitude < talkRadius * giant.GameScale;
+        // 집 앞(현관): 상인과 겹치면 상점이 우선
+        Vector3 dd = giant.transform.position - doorPos; dd.y = 0f;
+        canSave = house && !canTalk && dd.magnitude < saveRadius * giant.GameScale
+                  && !(GiantHealth.Instance && GiantHealth.Instance.IsDead);
         if (canTalk && d.sqrMagnitude > 1f) // 거인이 가까이 오면 그쪽을 봄
             npc.rotation = Quaternion.RotateTowards(npc.rotation, Quaternion.LookRotation(d), 90f * Time.unscaledDeltaTime);
         if (npcAnim) npcAnim.SetFloat("Speed", 0f);
@@ -161,9 +194,15 @@ public class GiantHome : MonoBehaviour
         if (open)
         {
             if (Input.GetKeyDown(KeyCode.E) || Input.GetKeyDown(KeyCode.Escape)) Close();
+            if (Input.GetKeyDown(KeyCode.Alpha0)) TryBuyPotion();
+            if (Input.GetKeyDown(KeyCode.S)) SaveNow();
             for (int k = 0; k < 9; k++) if (Input.GetKeyDown(KeyCode.Alpha1 + k)) TryBuy(k);
         }
-        else if (canTalk && Input.GetKeyDown(KeyCode.E) && !CardDraft.IsOpen && Time.timeScale > 0f) Open();
+        else if (Input.GetKeyDown(KeyCode.E) && !CardDraft.IsOpen && Time.timeScale > 0f)
+        {
+            if (canTalk) Open();
+            else if (canSave) SaveNow();
+        }
     }
 
     void Open()
@@ -179,6 +218,8 @@ public class GiantHome : MonoBehaviour
     void Close()
     {
         open = false;
+        ClosedFrame = Time.frameCount;
+        messageUntil = 0f; // 상점 안 메시지가 닫은 뒤 화면에 남지 않게
         Time.timeScale = prevTimeScale > 0f ? prevTimeScale : 1f;
         Cursor.lockState = prevLock; Cursor.visible = prevVisible;
     }
@@ -192,6 +233,23 @@ public class GiantHome : MonoBehaviour
         else if (pi.Buy(i)) { message = e.level == 0 ? $"{e.name} 구매 완료!" : $"{e.name} 강화 완료!"; }
         else { message = "돈이 모자라. 건물을 더 부수고 와."; }
         messageUntil = Time.unscaledTime + 2.5f;
+    }
+
+    // HP 회복약: 즉시 최대 HP의 일정 비율 회복 (HP가 가득 차 있으면 팔지 않음)
+    void TryBuyPotion()
+    {
+        var g = GiantHealth.Instance;
+        if (!g) return;
+        if (g.HP >= g.maxHP) message = "HP가 이미 가득 찼어.";
+        else if (Money.TrySpend(potionPrice)) { g.Heal(g.maxHP * potionHealRatio); message = "회복약을 마셨다! HP 회복."; }
+        else message = "돈이 모자라. 건물을 더 부수고 와.";
+        messageUntil = Time.unscaledTime + 2.5f;
+    }
+
+    void SaveNow()
+    {
+        message = SaveGame.Save() ? "저장 완료! 시작 화면의 '이어하기'로 계속할 수 있어." : "저장하지 못했어...";
+        messageUntil = Time.unscaledTime + 3f;
     }
 
     // ───────────── 화면 ─────────────
@@ -212,6 +270,11 @@ public class GiantHome : MonoBehaviour
 
         if (canTalk && !open)
             CardDraft.ShadowLabel(new Rect(0, H * 0.72f, W, 30), "[E] 상인에게 말 걸기 (상점)", CardDraft.Style(20, FontStyle.Bold, TextAnchor.MiddleCenter), new Color(1f, 0.9f, 0.5f));
+        else if (canSave && !open)
+            CardDraft.ShadowLabel(new Rect(0, H * 0.72f, W, 30), "[E] 저장하기", CardDraft.Style(20, FontStyle.Bold, TextAnchor.MiddleCenter), new Color(0.5f, 1f, 0.6f));
+        // 집 앞에서 저장한 결과 (상점 밖)
+        if (!open && Time.unscaledTime < messageUntil && !string.IsNullOrEmpty(message))
+            CardDraft.ShadowLabel(new Rect(0, H * 0.72f + 34, W, 28), message, CardDraft.Style(17, FontStyle.Bold, TextAnchor.MiddleCenter), Color.white);
 
         if (open) DrawShop(W, H);
     }
@@ -238,7 +301,7 @@ public class GiantHome : MonoBehaviour
         var pi = PassiveItems.Instance;
         int n = pi ? pi.ItemCount : 0;
         CardDraft.Box(new Rect(0, 0, W, H), new Color(0, 0, 0, 0.55f));
-        float pw = Mathf.Min(640f, W - 40f), rowH = 78f, ph = 150f + n * rowH + 40f;
+        float pw = Mathf.Min(640f, W - 40f), rowH = 78f, ph = 150f + (n + 1) * rowH + 40f; // +1: 회복약 줄
         var panel = new Rect((W - pw) * 0.5f, (H - ph) * 0.5f, pw, ph);
         CardDraft.Box(new Rect(panel.x - 3, panel.y - 3, panel.width + 6, panel.height + 6), new Color(1f, 0.85f, 0.4f, 0.85f));
         CardDraft.Box(panel, new Color(0.09f, 0.08f, 0.07f, 0.97f));
@@ -246,13 +309,42 @@ public class GiantHome : MonoBehaviour
         CardDraft.ShadowLabel(new Rect(panel.x, panel.y + 12, pw, 34), "거인의 상점", CardDraft.Style(26, FontStyle.Bold, TextAnchor.MiddleCenter), new Color(1f, 0.85f, 0.4f));
         int money = Money.Instance ? Money.Instance.Amount : 0;
         CardDraft.ShadowLabel(new Rect(panel.x, panel.y + 48, pw, 26), $"가진 돈  {money:N0}", CardDraft.Style(18, FontStyle.Bold, TextAnchor.MiddleCenter), Color.white);
-        string msg = Time.unscaledTime < messageUntil ? message : "클릭 또는 숫자키로 구매   ·   E / ESC 닫기";
+        string msg = Time.unscaledTime < messageUntil ? message : "클릭 또는 숫자키로 구매   ·   S 저장   ·   E / ESC 닫기";
         GUI.color = new Color(1, 1, 1, 0.7f);
         GUI.Label(new Rect(panel.x, panel.y + 76, pw, 22), msg, CardDraft.Style(13, FontStyle.Normal, TextAnchor.MiddleCenter));
         GUI.color = Color.white;
 
         var e = Event.current;
         float y = panel.y + 108f;
+
+        // 회복약 (소모품, 0번 키)
+        {
+            var g = GiantHealth.Instance;
+            var r = new Rect(panel.x + 16, y, pw - 32, rowH - 8);
+            bool full = !g || g.HP >= g.maxHP;
+            bool afford = money >= potionPrice && !full;
+            CardDraft.Box(r, new Color(0.15f, 0.14f, 0.13f, 1f));
+            CardDraft.Box(new Rect(r.x, r.y, 5, r.height), PotionColor);
+            GUI.color = new Color(1, 1, 1, 0.45f);
+            GUI.Label(new Rect(r.x + 10, r.y, 20, r.height), "0", CardDraft.Style(14, FontStyle.Bold, TextAnchor.MiddleCenter));
+            GUI.color = Color.white;
+            CardDraft.ShadowLabel(new Rect(r.x + 36, r.y + 6, 300, 24), "HP 회복약", CardDraft.Style(18, FontStyle.Bold, TextAnchor.MiddleLeft), PotionColor);
+            GUI.color = new Color(0.8f, 0.8f, 0.85f);
+            GUI.Label(new Rect(r.x + 36, r.y + 30, r.width - 180, 18), g ? $"현재 HP  {Mathf.CeilToInt(g.HP)} / {g.maxHP:0}" : "", CardDraft.Style(12, FontStyle.Normal, TextAnchor.MiddleLeft));
+            GUI.color = new Color(0.55f, 0.9f, 1f);
+            GUI.Label(new Rect(r.x + 36, r.y + 48, r.width - 180, 18), $"즉시 최대 HP의 {potionHealRatio * 100f:0}% 회복 (여러 번 구매 가능)", CardDraft.Style(12, FontStyle.Bold, TextAnchor.MiddleLeft));
+            GUI.color = Color.white;
+
+            var btn = new Rect(r.xMax - 132, r.y + 14, 120, r.height - 28);
+            bool hover = btn.Contains(e.mousePosition);
+            CardDraft.Box(btn, full ? new Color(0.3f, 0.3f, 0.32f) : afford ? (hover ? new Color(1f, 0.8f, 0.35f) : new Color(0.85f, 0.62f, 0.2f)) : new Color(0.35f, 0.25f, 0.2f));
+            GUI.color = afford || full ? Color.white : new Color(1, 1, 1, 0.5f);
+            GUI.Label(btn, full ? "HP 가득" : $"구매  {potionPrice:N0}", CardDraft.Style(15, FontStyle.Bold, TextAnchor.MiddleCenter));
+            GUI.color = Color.white;
+            if (e.type == EventType.MouseDown && e.button == 0 && btn.Contains(e.mousePosition)) { e.Use(); TryBuyPotion(); }
+            y += rowH;
+        }
+
         for (int i = 0; i < n; i++)
         {
             var it = pi.GetEntry(i);
@@ -280,7 +372,12 @@ public class GiantHome : MonoBehaviour
             y += rowH;
         }
 
-        var close = new Rect(panel.x + pw * 0.5f - 70, panel.yMax - 40, 140, 30);
+        var save = new Rect(panel.x + pw * 0.5f - 148, panel.yMax - 40, 140, 30);
+        CardDraft.Box(save, save.Contains(e.mousePosition) ? new Color(0.35f, 0.8f, 0.5f) : new Color(0.25f, 0.6f, 0.38f));
+        GUI.Label(save, "저장하기 (S)", CardDraft.Style(15, FontStyle.Bold, TextAnchor.MiddleCenter));
+        if (e.type == EventType.MouseDown && e.button == 0 && save.Contains(e.mousePosition)) { e.Use(); SaveNow(); }
+
+        var close = new Rect(panel.x + pw * 0.5f + 8, panel.yMax - 40, 140, 30);
         CardDraft.Box(close, close.Contains(e.mousePosition) ? new Color(0.5f, 0.5f, 0.55f) : new Color(0.35f, 0.35f, 0.4f));
         GUI.Label(close, "닫기", CardDraft.Style(15, FontStyle.Bold, TextAnchor.MiddleCenter));
         if (e.type == EventType.MouseDown && e.button == 0 && close.Contains(e.mousePosition)) { e.Use(); Close(); }

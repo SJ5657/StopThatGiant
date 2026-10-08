@@ -89,13 +89,24 @@ public class PoliceUnit : MonoBehaviour
         return o;
     }
 
+    // 해산(거인이 집에 들어감): 경찰이 차에 타고 거인에게서 멀어지다가 화면 밖에서 사라짐
+    bool dispersing; float disperseAt;
+    public void Disperse()
+    {
+        if (IsDead || dispersing) return;
+        dispersing = true; disperseAt = Time.time;
+        Board();
+        state = State.Leave;
+    }
+
     void OnDestroy()
     {
-        foreach (var o in officers) if (o.t && (o.inCar || IsDead && !o.fleeing)) Destroy(o.t.gameObject);
+        foreach (var o in officers) if (o.t && (o.inCar || (IsDead || dispersing) && !o.fleeing)) Destroy(o.t.gameObject);
     }
 
     static float Flat(Vector3 a, Vector3 b) { a.y = 0; b.y = 0; return Vector3.Distance(a, b); }
     Vector3 Node(int i, int j) => new Vector3(gridOrigin.x + i * pitch, transform.position.y, gridOrigin.z + j * pitch);
+    bool AllAboard { get { foreach (var o in officers) if (!o.dead && !o.fleeing && !o.inCar) return false; return true; } }
     int AliveOfficers { get { int n = 0; foreach (var o in officers) if (!o.dead && !o.fleeing) n++; return n; } }
 
     void Update()
@@ -136,8 +147,9 @@ public class PoliceUnit : MonoBehaviour
                 }
                 break;
             case State.Leave:
-                if (!moving) PickNode(gp, approach: false, gs);
+                if (!moving && (!dispersing || AllAboard)) PickNode(gp, approach: false, gs); // 해산 땐 경찰이 다 탈 때까지 기다렸다 출발
                 if (dist > 600f) { Destroy(gameObject); return; }
+                if (dispersing && (MilitarySpawner.OutOfSight(transform.position) && AllAboard || Time.time - disperseAt > 30f)) { Destroy(gameObject); return; }
                 break;
         }
         if (moving) DriveStep();
@@ -162,10 +174,10 @@ public class PoliceUnit : MonoBehaviour
 
     IEnumerable<Vector2Int> Neighbors()
     {
-        if (ci > 0) yield return new Vector2Int(ci - 1, cj);
-        if (ci < maxI) yield return new Vector2Int(ci + 1, cj);
-        if (cj > 0) yield return new Vector2Int(ci, cj - 1);
-        if (cj < maxJ) yield return new Vector2Int(ci, cj + 1);
+        if (ci > 0 && city.RoadOpen(ci, cj, ci - 1, cj)) yield return new Vector2Int(ci - 1, cj); // 블록을 붙여 없어진 도로는 지나지 않음
+        if (ci < maxI && city.RoadOpen(ci, cj, ci + 1, cj)) yield return new Vector2Int(ci + 1, cj);
+        if (cj > 0 && city.RoadOpen(ci, cj, ci, cj - 1)) yield return new Vector2Int(ci, cj - 1);
+        if (cj < maxJ && city.RoadOpen(ci, cj, ci, cj + 1)) yield return new Vector2Int(ci, cj + 1);
     }
 
     void DriveStep()

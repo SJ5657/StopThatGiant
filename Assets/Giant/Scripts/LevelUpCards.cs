@@ -173,6 +173,57 @@ public class LevelUpCards : MonoBehaviour
         ctrl.SetModelScale(baseModelScale * shownSizeMult);
     }
 
+    // ───────────── 세이브 (SaveGame) ─────────────
+    [Serializable]
+    public class State
+    {
+        public float attack, maxHP, hpRegen, damageTaken, maxStamina, xpMultiplier;
+        public float moveMult = 1f, staminaRegenMult = 1f, drainMult = 1f, sizeMult = 1f;
+        public int[] times;
+    }
+
+    public State Capture()
+    {
+        var s = new State
+        {
+            moveMult = moveMult, staminaRegenMult = staminaRegenMult, drainMult = drainMult, sizeMult = sizeMult,
+            times = new int[stats.Count]
+        };
+        for (int i = 0; i < stats.Count; i++) s.times[i] = stats[i].times;
+        if (stomp) s.attack = stomp.attackPower;
+        if (hp) { s.maxHP = hp.maxHP; s.hpRegen = hp.hpRegen; s.damageTaken = hp.damageTakenMultiplier; }
+        if (st) s.maxStamina = st.maxStamina;
+        if (lv) s.xpMultiplier = lv.xpMultiplier;
+        return s;
+    }
+
+    // 강화된 능력치를 그대로 되돌림 (HP는 SaveGame이 최대 HP를 맞춘 뒤 따로 되돌림)
+    public void Restore(State s)
+    {
+        if (s.times != null) for (int i = 0; i < stats.Count && i < s.times.Length; i++) stats[i].times = s.times[i];
+        if (stomp && s.attack > 0f) stomp.attackPower = s.attack;
+        if (hp && s.maxHP > 0f) { hp.maxHP = s.maxHP; hp.hpRegen = s.hpRegen; hp.damageTakenMultiplier = s.damageTaken; }
+        if (lv && s.xpMultiplier > 0f) lv.xpMultiplier = s.xpMultiplier;
+        if (ctrl)
+        {
+            moveMult = s.moveMult;
+            ctrl.walkSpeed = baseWalk * moveMult; ctrl.runSpeed = baseRun * moveMult;
+        }
+        if (st)
+        {
+            if (s.maxStamina > 0f) st.AddMaxStamina(s.maxStamina - st.maxStamina);
+            staminaRegenMult = s.staminaRegenMult; drainMult = s.drainMult;
+            st.walkRegen = baseWalkRegen * staminaRegenMult; st.idleRegen = baseIdleRegen * staminaRegenMult;
+            st.runDrain = baseDrain * drainMult;
+        }
+        if (ctrl && s.sizeMult > 1f)
+        {
+            if (!sizeBaseSet) { baseModelScale = ctrl.ModelScale; sizeBaseSet = true; }
+            sizeMult = shownSizeMult = Mathf.Min(s.sizeMult, maxSizeMultiplier);
+            ctrl.SetModelScale(baseModelScale * sizeMult);
+        }
+    }
+
     // ───────────── 자동 성장 (카드 끔) ─────────────
     string growText; float growUntil;
 

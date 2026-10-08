@@ -30,6 +30,9 @@ public class ScoreManager : MonoBehaviour
         }
     }
 
+    // 세이브 불러오기: 경험치는 LevelSystem이 따로 되돌림
+    public void Restore(int score) { Score = Mathf.Max(0, score); displayScore = Score; }
+
     void Update()
     {
         // 숫자가 부드럽게 올라가는 연출

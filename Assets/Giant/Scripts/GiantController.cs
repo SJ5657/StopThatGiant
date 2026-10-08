@@ -11,6 +11,7 @@ public class GiantController : MonoBehaviour
     public float gravity = 9.81f;
     public Transform cameraTransform;
     [Tooltip("이동 가능 범위 (0이면 제한 없음)")] public Vector2 areaHalfExtent;
+    [Tooltip("게임 시작 시 거인 크기 배율 (씬에 놓인 모델 크기 기준, 남녀 모델 모두 적용). 속도·발 반경·카메라 등도 함께 비례")] public float startSizeMultiplier = 0.7f;
 
     [HideInInspector] public Vector2 externalInput;
     [HideInInspector] public bool externalRun;
@@ -52,6 +53,12 @@ public class GiantController : MonoBehaviour
         float s0 = anim ? anim.transform.localScale.y : 1f;
         ccHeightPer = cc.height / s0; ccRadiusPer = cc.radius / s0; ccCenterYPer = cc.center.y / s0; ccStepPer = cc.stepOffset / s0;
         ccHeightBase = ccHeightPer; ccCenterBase = ccCenterYPer;
+        // 시작 크기: 모델 크기 1당 치수를 잰 뒤에 줄여야 충돌 캡슐도 비례해서 맞춰짐 (실제 적용은 성별 선택 Rebind 때)
+        if (startSizeMultiplier > 0f && !Mathf.Approximately(startSizeMultiplier, 1f))
+        {
+            foreach (var a in GetComponentsInChildren<Animator>(true)) a.transform.localScale *= startSizeMultiplier;
+            SetModelScale(ModelScale);
+        }
         if (!cameraTransform && Camera.main) cameraTransform = Camera.main.transform;
         // 거인은 건물/잔해에 막히지 않고 통과 (대신 GiantStomp가 부숨)
         int g = LayerMask.NameToLayer("Giant"), b = LayerMask.NameToLayer("Building"), d = LayerMask.NameToLayer("Debris");

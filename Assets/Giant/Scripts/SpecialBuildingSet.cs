@@ -49,7 +49,7 @@ public abstract class SpecialBuildingSet : MonoBehaviour
     // 모든 특수 건물이 Awake에서 등록된 뒤에 고르므로 실행 순서와 관계없이 겹치지 않음
     protected virtual void Start()
     {
-        if (ratio <= 0f) return;
+        if (ratio <= 0f || SaveGame.Loading) return; // 이어하기면 저장된 자리로 되돌림 (Restore)
         foreach (var b in Buildings)
             if (b && !IsSpecial(b) && rng.NextDouble() < ratio) Paint(b);
     }
@@ -114,6 +114,20 @@ public abstract class SpecialBuildingSet : MonoBehaviour
         return n;
     }
 
+    // ───────────── 세이브 (SaveGame) ─────────────
+    public IEnumerable<GameObject> Members => members;
+    public IEnumerable<GameObject> RolledBuildings => rolled;
+
+    // 저장된 건물들을 다시 이 건물로 바꾸고, 이미 확률을 굴린 건물 목록을 되돌림
+    public void Restore(IEnumerable<GameObject> painted, IEnumerable<GameObject> rolledList)
+    {
+        foreach (var b in painted) if (b && b.activeInHierarchy && !IsSpecial(b)) Paint(b);
+        foreach (var b in rolledList) if (b) rolled.Add(b);
+    }
+
+    // 등장 확률만 되돌림 (SetChance와 달리 추가로 굴리지 않음)
+    public void RestoreChance(float p) => Chance = Mathf.Clamp01(p);
+
     void Paint(GameObject b)
     {
         members.Add(b);
@@ -148,6 +162,22 @@ public abstract class SpecialBuildingSet : MonoBehaviour
         float s = Mathf.Min(size.x / Mathf.Max(0.01f, footX), size.z / Mathf.Max(0.01f, footZ)) * modelFit;
 
         Quaternion rot = Quaternion.Euler(0f, yaw, 0f);
+        if (ModelScale > 1f)
+        {
+            // 부지보다 크게: 상자(충돌·파괴 판정)도 커진 모델 크기에 맞춤. 앞면(도로 쪽)은 그대로 두고 블록 안쪽으로 키우며,
+            // 커진 자리에 겹치는 일반 건물은 숨김
+            s *= ModelScale;
+            foreach (Transform part in t) part.gameObject.SetActive(false); // 위층·ㄴ자 날개는 상자와 함께 늘어나지 않게 치움 (모델이 대신함)
+            Vector3 newSize = new Vector3((sideways ? mb.size.z : mb.size.x) * s, mb.size.y * s, (sideways ? mb.size.x : mb.size.z) * s);
+            float depthGrow = sideways ? newSize.x - size.x : newSize.z - size.z;
+            Vector3 ground = t.position - Vector3.up * size.y * 0.5f;
+            Vector3 ps = t.parent ? t.parent.lossyScale : Vector3.one;
+            t.localScale = new Vector3(newSize.x / ps.x, newSize.y / ps.y, newSize.z / ps.z);
+            t.position = ground - rot * Vector3.forward * depthGrow * 0.5f + Vector3.up * newSize.y * 0.5f;
+            size = newSize;
+            HideOverlapped(b);
+        }
+
         Vector3 basePos = t.position - Vector3.up * size.y * 0.5f;
         go.transform.SetParent(t, false);
         go.transform.localRotation = rot;
@@ -158,6 +188,25 @@ public abstract class SpecialBuildingSet : MonoBehaviour
             : new Vector3(s / size.x, s / size.y, s / size.z);
 
         OnModelPlaced(b, go, basePos + Vector3.up * mb.size.y * s);
+    }
+
+    // 모델 크기 배율 (1 = 부지에 맞춤, 1보다 크면 부지를 넘어 주변 건물 자리까지 차지)
+    protected virtual float ModelScale => 1f;
+
+    static readonly Collider[] overlapHits = new Collider[64];
+
+    // 커진 특수 건물 자리에 겹치는 일반 건물을 숨김 (살짝 닿기만 한 건물은 남김)
+    void HideOverlapped(GameObject b)
+    {
+        Physics.SyncTransforms();
+        var t = b.transform;
+        int n = Physics.OverlapBoxNonAlloc(t.position, t.lossyScale * 0.45f, overlapHits, t.rotation, 1 << b.layer, QueryTriggerInteraction.Ignore);
+        for (int i = 0; i < n; i++)
+        {
+            var o = overlapHits[i].gameObject;
+            if (o == b || IsSpecial(o) || !Buildings.Contains(o)) continue;
+            o.SetActive(false);
+        }
     }
 
     // 모델을 세운 뒤 호출 (top = 모델 꼭대기 월드 위치). 표시 아이콘 등을 붙이는 용도

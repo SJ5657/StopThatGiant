@@ -37,6 +37,17 @@ public class JetAI : MonoBehaviour
 
     void Start() { vel = transform.forward * speed; }
 
+    // 해산(거인이 집에 들어감): 폭격을 취소하고 그대로 지나가 화면 밖에서 사라짐
+    bool dispersing; float disperseAt;
+    public void Disperse()
+    {
+        if (IsDead || dispersing) return;
+        dispersing = true; disperseAt = Time.time;
+        if (markers != null) for (int i = nextTarget; i < markers.Length; i++) if (markers[i]) Destroy(markers[i].gameObject);
+        if (targets != null) nextTarget = targets.Length; // 남은 폭탄 투하 안 함
+        state = State.Egress; stateUntil = float.MaxValue;
+    }
+
     float PassAltitude(GiantHealth g) => g.ShoulderY + g.Scale * 0.35f + passHeightAboveHead;
 
     void Update()
@@ -46,6 +57,7 @@ public class JetAI : MonoBehaviour
         var g = GiantHealth.Instance;
         if (!g) { transform.position += vel * dt; return; }
         if (g.IsTouching(transform.position, contactRadius)) { Explode(); return; }
+        if (dispersing && (MilitarySpawner.OutOfSight(transform.position) || Time.time - disperseAt > 30f)) { Destroy(gameObject); return; }
 
         Vector3 gp = g.transform.position;
         Vector3 flatVel = new Vector3(vel.x, 0, vel.z);

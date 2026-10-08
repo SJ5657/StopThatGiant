@@ -3,6 +3,8 @@ using UnityEngine;
 
 // 거인이 부순 건물 수에 따라 경찰 → 군대(탱크/헬기/전투기)를 점점 더 많이 투입.
 // 처음엔 경찰차가 나오고, firstTankAt 채를 부수면 탱크 1대 → 부술수록 증원. 파괴된 유닛도 목표 수량까지 보충.
+// 거인이 집 마당(안전지대)에 들어가면 남아 있는 적은 모두 해산(물러나서 화면 밖에서 사라짐)하고 새로 투입하지 않음.
+// 투입 수량은 부순 건물 수로만 정해지므로, 마당을 나오면 같은 난이도로 다시 보충됨.
 public class MilitarySpawner : MonoBehaviour
 {
     public GameObject tankPrefab;
@@ -47,6 +49,7 @@ public class MilitarySpawner : MonoBehaviour
     float nextSpawn;
     int lastWantedT, lastWantedH;
     string banner; float bannerUntil;
+    bool wasSafe;
 
     public static MilitarySpawner Instance { get; private set; }
 
@@ -72,6 +75,16 @@ public class MilitarySpawner : MonoBehaviour
         helis.RemoveAll(h => !h || h.IsDead);
         jets.RemoveAll(j => !j || j.IsDead);
         police.RemoveAll(p => !p || p.IsDead);
+
+        // 거인의 집 안: 남아 있는 적 해산 + 투입 중지
+        if (GiantHome.GiantSafe)
+        {
+            if (!wasSafe) DisperseAll();
+            wasSafe = true;
+            return;
+        }
+        wasSafe = false;
+
         int wj = WantedJets;
         if (wj > lastWantedJ) lastWantedJ = wj;
 
@@ -86,6 +99,25 @@ public class MilitarySpawner : MonoBehaviour
         else if (tanks.Count < wt) { SpawnTank(g); nextSpawn = Time.time + spawnInterval; }
         else if (helis.Count < wh) { SpawnHeli(g); nextSpawn = Time.time + spawnInterval; }
         else if (jets.Count < wj) { SpawnJet(g); nextSpawn = Time.time + spawnInterval * 2f; }
+    }
+
+    // 남아 있는 적을 모두 해산시키고 목록에서 뺌 (해산 중인 유닛은 수량에 세지 않음)
+    void DisperseAll()
+    {
+        foreach (var t in tanks) t.Disperse();
+        foreach (var h in helis) h.Disperse();
+        foreach (var j in jets) j.Disperse();
+        foreach (var p in police) p.Disperse();
+        tanks.Clear(); helis.Clear(); jets.Clear(); police.Clear();
+    }
+
+    // 해산 중인 유닛이 사라져도 되는지: 카메라 화면 밖
+    public static bool OutOfSight(Vector3 p)
+    {
+        var cam = Camera.main;
+        if (!cam) return true;
+        Vector3 v = cam.WorldToViewportPoint(p);
+        return v.z < 0f || v.x < -0.1f || v.x > 1.1f || v.y < -0.1f || v.y > 1.1f;
     }
 
     [Tooltip("화면 중앙 경고 문구(폭격 경고 등) 표시 여부")] public bool showBanners = false;

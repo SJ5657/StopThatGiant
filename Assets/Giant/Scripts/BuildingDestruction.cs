@@ -38,6 +38,7 @@ public class BuildingDestruction : MonoBehaviour
     public Material dustMaterial;
 
     public int DestroyedCount { get; private set; }
+    public void RestoreCount(int n) => DestroyedCount = Mathf.Max(0, n); // 세이브 불러오기 (군대 규모도 이 수를 따름)
 
     // 파편 데이터 (구조체 배열 = GC 없음)
     struct Shard

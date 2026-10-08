@@ -45,6 +45,10 @@ public class HeliAI : MonoBehaviour
     float angle, nextFire;
     Vector3 vel, fallSpin;
 
+    // 해산(거인이 집에 들어감): 거인 반대쪽으로 날아가다가 화면 밖에서 사라짐
+    bool dispersing; float disperseAt;
+    public void Disperse() { if (!IsDead && !dispersing) { dispersing = true; disperseAt = Time.time; } }
+
     void Start()
     {
         angle = startAngle;
@@ -65,6 +69,17 @@ public class HeliAI : MonoBehaviour
 
         // 거인 몸에 닿으면 폭발
         if (g.IsTouching(transform.position, contactRadius)) { Explode(); return; }
+
+        if (dispersing)
+        {
+            if (MilitarySpawner.OutOfSight(transform.position) || Time.time - disperseAt > 30f) { Destroy(gameObject); return; }
+            Vector3 away = transform.position - c; away.y = 0;
+            away = away.sqrMagnitude > 1f ? away.normalized : transform.forward;
+            vel = Vector3.MoveTowards(vel, (away + Vector3.up * 0.15f) * maxSpeed, maxSpeed * dt);
+            transform.position += vel * dt;
+            transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(away) * Quaternion.Euler(12f, 0, 0), dt * 2f);
+            return;
+        }
 
         angle += angularSpeed * direction * dt;
         float rad = angle * Mathf.Deg2Rad;

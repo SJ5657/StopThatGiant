@@ -265,6 +265,42 @@ public class PassiveItems : MonoBehaviour
         if (n > 0) Toast($"주변에 {it.set.DisplayName} {n}채가 나타났다!", it.color);
     }
 
+    // ───────────── 세이브 (SaveGame) ─────────────
+    [System.Serializable]
+    public class State
+    {
+        public int[] level;
+        public float[] chance, heal;
+        public int[] owned; // 장착한 순서 (화면 왼쪽 위 아이콘 순서)
+    }
+
+    public State Capture()
+    {
+        var s = new State { level = new int[items.Count], chance = new float[items.Count], heal = new float[items.Count], owned = new int[owned.Count] };
+        for (int i = 0; i < items.Count; i++) { s.level[i] = items[i].level; s.chance[i] = items[i].chance; s.heal[i] = items[i].heal; }
+        for (int i = 0; i < owned.Count; i++) s.owned[i] = items.IndexOf(owned[i]);
+        return s;
+    }
+
+    // 아이템 레벨·효과를 되돌림. 공장 배치는 SaveGame이 먼저 되돌리므로 여기선 확률만 맞추고 새로 굴리지 않음
+    public void Restore(State s)
+    {
+        if (s.level == null) return;
+        owned.Clear();
+        for (int i = 0; i < items.Count && i < s.level.Length; i++)
+        {
+            var it = items[i];
+            it.level = s.level[i];
+            it.chance = s.chance[i];
+            it.heal = s.heal[i];
+            if (it.level <= 0) continue;
+            if (it.eat) { it.eat.unlocked = true; it.eat.healPerCivilian = it.heal; }
+            else it.set.RestoreChance(it.chance);
+        }
+        if (s.owned != null)
+            foreach (int i in s.owned) if (i >= 0 && i < items.Count && items[i].level > 0 && !owned.Contains(items[i])) owned.Add(items[i]);
+    }
+
     // ───────────── 길가 아이템 ─────────────
     // 거인 주변 거리 범위 안의 도로 한가운데 지점 찾기
     bool TryRoadPoint(Vector3 center, out Vector3 pos)
@@ -285,6 +321,7 @@ public class PassiveItems : MonoBehaviour
             float rz = origin.z + half + Mathf.Round((p.z - origin.z - half) / pitch) * pitch;
             if (Mathf.Abs(p.x - rx) < Mathf.Abs(p.z - rz)) p.x = rx; else p.z = rz;
             if (p.x < origin.x || p.x > origin.x + sizeX || p.z < origin.z || p.z > origin.z + sizeZ) continue;
+            if (city.OnClosedRoad(p)) continue; // 블록을 붙여 없어진 도로 자리(건물이 들어섬)
             if (ctrl && ctrl.areaHalfExtent.x > 0 && (Mathf.Abs(p.x) > ctrl.areaHalfExtent.x || Mathf.Abs(p.z) > ctrl.areaHalfExtent.y)) continue;
             Vector3 d = p - center; d.y = 0f;
             if (d.magnitude < pickupDistance.x * 0.8f) continue;

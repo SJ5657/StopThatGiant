@@ -43,6 +43,14 @@ public class LevelSystem : MonoBehaviour
         }
     }
 
+    // 세이브 불러오기: 레벨업 이벤트 없이 레벨·경험치만 되돌림 (능력치는 LevelUpCards가 따로 되돌림)
+    public void Restore(int level, int xp)
+    {
+        Level = Mathf.Clamp(level, 1, maxLevel);
+        Xp = Mathf.Max(0, xp);
+        displayFill = Level >= maxLevel ? 1f : (float)Xp / XpToNext;
+    }
+
     void Update()
     {
         float target = Level >= maxLevel ? 1f : (float)Xp / XpToNext;

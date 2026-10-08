@@ -110,6 +110,9 @@ public class GiantHealth : MonoBehaviour
         HP = Mathf.Min(maxHP, HP + amount);
     }
 
+    // 세이브 불러오기: HP를 그대로 되돌림 (최대 HP를 먼저 되돌린 뒤 호출)
+    public void SetHP(float value) => HP = Mathf.Clamp(value, 1f, maxHP);
+
     // HP 회복 (초록 회복 영역)
     public void Heal(float amount)
     {

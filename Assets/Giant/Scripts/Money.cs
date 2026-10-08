@@ -28,6 +28,8 @@ public class Money : MonoBehaviour
         return true;
     }
 
+    public void Restore(int amount) { Amount = Mathf.Max(0, amount); shown = Amount; } // 세이브 불러오기
+
     public static void AddForBuilding() { if (Instance) Add(Instance.perBuilding); }
 
     void Update()

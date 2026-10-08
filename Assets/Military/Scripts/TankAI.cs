@@ -27,6 +27,10 @@ public class TankAI : MonoBehaviour
     [Tooltip("체력 (방귀 가스 등 지속 피해용. 거인에게 밟히면 체력과 관계없이 즉사)")] public float maxHP = 60f;
     float hp = -1f;
 
+    // 해산(거인이 집에 들어감): 사격을 멈추고 거인에게서 멀어지다가 화면 밖에서 사라짐
+    bool dispersing; float disperseAt;
+    public void Disperse() { if (!IsDead && !dispersing) { dispersing = true; disperseAt = Time.time; } }
+
     // 지속 피해 (방귀 가스). 체력이 다 떨어지면 터짐
     public void TakeDamage(float dmg)
     {
@@ -85,6 +89,14 @@ public class TankAI : MonoBehaviour
         if (!g) return;
         Vector3 gp = g.transform.position;
         float dist = Flat(transform.position, gp);
+
+        if (dispersing)
+        {
+            if (MilitarySpawner.OutOfSight(transform.position) || Time.time - disperseAt > 30f) { Destroy(gameObject); return; }
+            if (!moving) Decide(gp, 0f); // 거리 0으로 넘겨서 항상 멀어지는 교차로 선택
+            if (moving) Drive();
+            return;
+        }
 
         bool los = FindVisibleAim(g, MuzzlePos, out _);
         noLosTime = los ? 0f : noLosTime + Time.deltaTime;
@@ -156,10 +168,10 @@ public class TankAI : MonoBehaviour
 
     System.Collections.Generic.IEnumerable<Vector2Int> Neighbors()
     {
-        if (ci > 0) yield return new Vector2Int(ci - 1, cj);
-        if (ci < maxI) yield return new Vector2Int(ci + 1, cj);
-        if (cj > 0) yield return new Vector2Int(ci, cj - 1);
-        if (cj < maxJ) yield return new Vector2Int(ci, cj + 1);
+        if (ci > 0 && city.RoadOpen(ci, cj, ci - 1, cj)) yield return new Vector2Int(ci - 1, cj); // 블록을 붙여 없어진 도로는 지나지 않음
+        if (ci < maxI && city.RoadOpen(ci, cj, ci + 1, cj)) yield return new Vector2Int(ci + 1, cj);
+        if (cj > 0 && city.RoadOpen(ci, cj, ci, cj - 1)) yield return new Vector2Int(ci, cj - 1);
+        if (cj < maxJ && city.RoadOpen(ci, cj, ci, cj + 1)) yield return new Vector2Int(ci, cj + 1);
     }
 
     void Drive()
