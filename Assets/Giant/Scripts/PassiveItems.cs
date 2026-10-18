@@ -381,7 +381,7 @@ public class PassiveItems : MonoBehaviour
 
     void OnGUI()
     {
-        if (GameStartMenu.InMenu) return; // 시작 메뉴 중에는 HUD 숨김
+        if (GameStartMenu.InMenu || GameStartMenu.HideHud) return; // 시작 메뉴 중이거나 HUD 숨김이면 그리지 않음
         DrawOwned();
         float left = toastUntil - Time.unscaledTime;
         if (!CardDraft.IsOpen && !string.IsNullOrEmpty(toast) && left > 0f)

@@ -3,7 +3,7 @@ using UnityEngine;
 // 게임 시작 화면 → 성별(거인 모델) 선택 → 게임 시작.
 // 메뉴 동안에는 게임을 멈추고(Time.timeScale = 0) 게임 HUD를 숨기며, 배경에 거인을 보여주면서 카메라가 천천히 흔들린다.
 // 성별 카드에 마우스를 올리면 배경의 거인이 그 모델로 바뀌어 미리보기됨. 성별을 고른 뒤에만 '게임 시작'이 활성화.
-// 시작 화면: 이어하기(세이브가 있을 때, SaveGame) / 게임 시작(HP 0이면 패배) / 무한모드(HP 0이 되어도 죽지 않음) / 게임 종료.
+// 시작 화면: 게임 시작(HP 0이면 패배) / 무한모드(HP 0이 되어도 죽지 않음) / 게임 종료.
 // 사망 후 R로 재시작하면 시작 화면 없이 같은 성별·같은 모드로 바로 시작.
 // 게임 중 ESC: 게임을 멈추고 일시정지 메뉴(계속하기 / 시작 화면으로 / 게임 종료).
 // [ExecuteAlways]: 재생 전(편집 모드)에도 Game 창에 시작 화면을 미리보기로 그림 — 화면 그리기와 카메라 배치만 하고,
@@ -13,6 +13,8 @@ public class GameStartMenu : MonoBehaviour
 {
     public static GameStartMenu Instance { get; private set; }
     public static bool InMenu => Instance != null && Instance.state != State.Playing;
+    // 게임 중 HUD(점수·돈·아이템·새장 등)를 숨김. 시작 메뉴·상점 등 조작 화면은 그대로
+    public static bool HideHud = true;
 
     [System.Serializable]
     public class GiantOption
@@ -86,7 +88,6 @@ public class GameStartMenu : MonoBehaviour
             SetActiveModel(0);
         }
         stateAt = Time.unscaledTime;
-        if (state == State.Title) saveInfo = SaveGame.Peek();
     }
 
     void Start()
@@ -150,12 +151,9 @@ public class GameStartMenu : MonoBehaviour
 
     // ───────────── 흐름 ─────────────
     void GoSelect() { state = State.Select; stateAt = Time.unscaledTime; }
-    void GoTitle() { state = State.Title; selected = -1; stateAt = Time.unscaledTime; saveInfo = SaveGame.Peek(); }
+    void GoTitle() { state = State.Title; selected = -1; stateAt = Time.unscaledTime; }
 
-    // 이어하기: 저장된 세이브의 요약 (시작 화면 버튼에 표시)
-    SaveGame.Data saveInfo;
-
-    // 시작 화면 없이 이 성별·모드로 씬을 다시 불러옴 (세이브 이어하기)
+    // 시작 화면 없이 이 성별·모드로 씬을 다시 불러옴
     public static void RestartWith(int choice, bool infinite)
     {
         lastChoice = choice; lastInfinite = infinite;
@@ -355,15 +353,6 @@ public class GameStartMenu : MonoBehaviour
 
         float bw = Mathf.Clamp(W * 0.22f, 240f, 340f), bh = Mathf.Clamp(H * 0.075f, 48f, 72f);
         float y = H * 0.5f;
-        // 세이브가 있으면 맨 위에 '이어하기' (거인의 집 상점에서 저장)
-        if (Application.isPlaying && saveInfo != null)
-        {
-            if (MenuButton(new Rect(x, y, bw, bh), "이어하기", new Color(0.3f, 0.75f, 0.45f), true, fade)) { SaveGame.Continue(); return; }
-            string mode = saveInfo.infinite ? "무한모드  ·  " : "";
-            ShadowLabel(new Rect(x + bw + 16, y, W * 0.4f, bh), $"{mode}LV {saveInfo.level}  ·  점수 {saveInfo.score:N0}\n<size=12>{saveInfo.savedAt} 저장</size>",
-                Style(15, FontStyle.Bold, TextAnchor.MiddleLeft), new Color(1f, 1f, 1f, 0.85f * fade));
-            y += bh * 1.3f;
-        }
         if (MenuButton(new Rect(x, y, bw, bh), "게임 시작", new Color(1f, 0.55f, 0.15f), true, fade)) { pendingInfinite = false; GoSelect(); return; }
         if (MenuButton(new Rect(x, y + bh * 1.3f, bw, bh), "무한모드", new Color(0.55f, 0.4f, 1f), true, fade)) { pendingInfinite = true; GoSelect(); return; }
         if (MenuButton(new Rect(x, y + bh * 2.6f, bw, bh), "게임 종료", new Color(0.42f, 0.45f, 0.52f), true, fade)) { Quit(); return; }

@@ -19,6 +19,14 @@ public class Projectile : MonoBehaviour
 
     void Update()
     {
+        if (EnemyFreeze.Active)
+        {
+            // 보급상자 효과: 날아가던 포탄도 정지 (수명도 같이 멈춤). 멈춘 포탄에 거인이 닿으면 피해를 입고 터짐
+            dieAt += Time.deltaTime;
+            var fg = GiantHealth.Instance;
+            if (fg && !fg.IsDead && fg.IsTouching(transform.position, 1.5f)) { fg.TakeDamage(damage); Explode(transform.position); }
+            return;
+        }
         float dt = Time.deltaTime;
         var g = GiantHealth.Instance;
         if (homing > 0 && g && !g.IsDead)

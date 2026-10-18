@@ -1,9 +1,9 @@
 using UnityEngine;
 
 // 거인의 집(상점): 도시 동쪽 바깥에 거인 크기의 집 + 담벽(도시 쪽에 대문) + 넓은 잔디 마당을 게임 시작 시 만들고,
-// 마당에 거인만 한 상인 NPC를 세움. NPC 가까이에서 E를 누르면 게임이 멈추고 상점 창이 열려 돈(Money)으로 패시브 아이템·HP 회복약 구매.
+// 마당에 거인만 한 상인 NPC를 세움. NPC 가까이에서 E를 누르면 게임이 멈추고 상점 창이 열려 돈(Money)으로 HP 회복약·새장(CageSkill) 구매
+// (sellItems를 켜면 패시브 아이템도 판매).
 // 거인이 마당 안으로 들어올 수 있게 이동 범위를 열어줌(Allows). 집이 화면 밖이면 가장자리에 방향 표시.
-// 집 앞에서 E(또는 상점의 '저장하기'·S)로 게임을 저장 → 시작 화면 '이어하기'로 계속 (SaveGame).
 public class GiantHome : MonoBehaviour
 {
     public static GiantHome Instance { get; private set; }
@@ -31,19 +31,21 @@ public class GiantHome : MonoBehaviour
 
     [Header("상점")]
     [Tooltip("NPC와 이 거리 안이면 말을 걸 수 있음 (거인 크기 기준)")] public float talkRadius = 2.2f;
-    [Tooltip("HP 회복약 가격 (여러 번 살 수 있고 가격 고정)")] public int potionPrice = 100;
+    [Tooltip("상점에서 패시브 아이템(공장·거인의 식욕)도 팔지. 끄면 회복약만")] public bool sellItems = false;
+    [Tooltip("HP 회복약 첫 구매 가격 (살 때마다 2배로 오름)")] public int potionPrice = 100;
+    [Tooltip("살 때마다 가격이 오르는 배율 (2 = 2배씩)")] public float potionPriceGrowth = 2f;
+    int potionsBought;
+    int CurrentPotionPrice => Mathf.RoundToInt(potionPrice * Mathf.Pow(potionPriceGrowth, Mathf.Min(potionsBought, 30)));
     [Tooltip("회복약 하나로 회복하는 양 (최대 HP 대비, 0.35 = 35%)")] [Range(0f, 1f)] public float potionHealRatio = 0.35f;
     static readonly Color PotionColor = new Color(0.4f, 1f, 0.5f);
-
-    [Header("저장")]
-    [Tooltip("집 앞(현관)에서 이 거리 안이면 E로 저장 (거인 크기 기준)")] public float saveRadius = 2.5f;
+    static readonly Color CageColor = new Color(0.95f, 0.75f, 0.3f);
 
     Rect yardRect;           // 마당 (XZ)
     Transform npc, house;
     Vector3 doorPos;         // 집 정면 가운데 (도시 쪽 벽)
     Animator npcAnim;
     GiantController giant;
-    bool open, canTalk, canSave, built;
+    bool open, canTalk, built;
     float prevTimeScale = 1f;
     CursorLockMode prevLock; bool prevVisible;
     string message; float messageUntil;
@@ -180,13 +182,9 @@ public class GiantHome : MonoBehaviour
     // ───────────── 말 걸기 / 상점 열기 ─────────────
     void Update()
     {
-        if (!npc || !giant || GameStartMenu.InMenu) { canTalk = canSave = false; return; }
+        if (!npc || !giant || GameStartMenu.InMenu) { canTalk = false; return; }
         Vector3 d = giant.transform.position - npc.position; d.y = 0f;
         canTalk = d.magnitude < talkRadius * giant.GameScale;
-        // 집 앞(현관): 상인과 겹치면 상점이 우선
-        Vector3 dd = giant.transform.position - doorPos; dd.y = 0f;
-        canSave = house && !canTalk && dd.magnitude < saveRadius * giant.GameScale
-                  && !(GiantHealth.Instance && GiantHealth.Instance.IsDead);
         if (canTalk && d.sqrMagnitude > 1f) // 거인이 가까이 오면 그쪽을 봄
             npc.rotation = Quaternion.RotateTowards(npc.rotation, Quaternion.LookRotation(d), 90f * Time.unscaledDeltaTime);
         if (npcAnim) npcAnim.SetFloat("Speed", 0f);
@@ -195,13 +193,13 @@ public class GiantHome : MonoBehaviour
         {
             if (Input.GetKeyDown(KeyCode.E) || Input.GetKeyDown(KeyCode.Escape)) Close();
             if (Input.GetKeyDown(KeyCode.Alpha0)) TryBuyPotion();
-            if (Input.GetKeyDown(KeyCode.S)) SaveNow();
-            for (int k = 0; k < 9; k++) if (Input.GetKeyDown(KeyCode.Alpha1 + k)) TryBuy(k);
+            int first = CageSkill.Instance ? 1 : 0; // 새장이 1번, 패시브 아이템은 그다음 번호
+            if (first == 1 && Input.GetKeyDown(KeyCode.Alpha1)) TryBuyCage();
+            for (int k = 0; k < 9 - first; k++) if (Input.GetKeyDown(KeyCode.Alpha1 + first + k)) TryBuy(k);
         }
         else if (Input.GetKeyDown(KeyCode.E) && !CardDraft.IsOpen && Time.timeScale > 0f)
         {
             if (canTalk) Open();
-            else if (canSave) SaveNow();
         }
     }
 
@@ -227,11 +225,22 @@ public class GiantHome : MonoBehaviour
     void TryBuy(int i)
     {
         var pi = PassiveItems.Instance;
-        if (!pi || i >= pi.ItemCount) return;
+        if (!sellItems || !pi || i >= pi.ItemCount) return;
         var e = pi.GetEntry(i);
         if (e.maxed) { message = "그건 더 강화할 수 없어."; }
         else if (pi.Buy(i)) { message = e.level == 0 ? $"{e.name} 구매 완료!" : $"{e.name} 강화 완료!"; }
         else { message = "돈이 모자라. 건물을 더 부수고 와."; }
+        messageUntil = Time.unscaledTime + 2.5f;
+    }
+
+    void TryBuyCage()
+    {
+        var c = CageSkill.Instance;
+        if (!c) return;
+        bool first = c.Level == 0;
+        if (c.Maxed) message = "새장을 더 키울 수는 없어.";
+        else if (c.Buy()) message = first ? "새장 구매 완료! 적을 죽이면 새장에 가둬 부하로 쓸 수 있어." : $"새장 강화 완료! 이제 {c.Capacity}명까지 들어가.";
+        else message = "돈이 모자라. 건물을 더 부수고 와.";
         messageUntil = Time.unscaledTime + 2.5f;
     }
 
@@ -241,15 +250,9 @@ public class GiantHome : MonoBehaviour
         var g = GiantHealth.Instance;
         if (!g) return;
         if (g.HP >= g.maxHP) message = "HP가 이미 가득 찼어.";
-        else if (Money.TrySpend(potionPrice)) { g.Heal(g.maxHP * potionHealRatio); message = "회복약을 마셨다! HP 회복."; }
+        else if (Money.TrySpend(CurrentPotionPrice)) { potionsBought++; g.Heal(g.maxHP * potionHealRatio); message = "회복약을 마셨다! HP 회복."; }
         else message = "돈이 모자라. 건물을 더 부수고 와.";
         messageUntil = Time.unscaledTime + 2.5f;
-    }
-
-    void SaveNow()
-    {
-        message = SaveGame.Save() ? "저장 완료! 시작 화면의 '이어하기'로 계속할 수 있어." : "저장하지 못했어...";
-        messageUntil = Time.unscaledTime + 3f;
     }
 
     // ───────────── 화면 ─────────────
@@ -270,11 +273,6 @@ public class GiantHome : MonoBehaviour
 
         if (canTalk && !open)
             CardDraft.ShadowLabel(new Rect(0, H * 0.72f, W, 30), "[E] 상인에게 말 걸기 (상점)", CardDraft.Style(20, FontStyle.Bold, TextAnchor.MiddleCenter), new Color(1f, 0.9f, 0.5f));
-        else if (canSave && !open)
-            CardDraft.ShadowLabel(new Rect(0, H * 0.72f, W, 30), "[E] 저장하기", CardDraft.Style(20, FontStyle.Bold, TextAnchor.MiddleCenter), new Color(0.5f, 1f, 0.6f));
-        // 집 앞에서 저장한 결과 (상점 밖)
-        if (!open && Time.unscaledTime < messageUntil && !string.IsNullOrEmpty(message))
-            CardDraft.ShadowLabel(new Rect(0, H * 0.72f + 34, W, 28), message, CardDraft.Style(17, FontStyle.Bold, TextAnchor.MiddleCenter), Color.white);
 
         if (open) DrawShop(W, H);
     }
@@ -299,9 +297,10 @@ public class GiantHome : MonoBehaviour
     {
         GUI.depth = -150;
         var pi = PassiveItems.Instance;
-        int n = pi ? pi.ItemCount : 0;
+        int n = sellItems && pi ? pi.ItemCount : 0;
         CardDraft.Box(new Rect(0, 0, W, H), new Color(0, 0, 0, 0.55f));
-        float pw = Mathf.Min(640f, W - 40f), rowH = 78f, ph = 150f + (n + 1) * rowH + 40f; // +1: 회복약 줄
+        int rows = n + 1 + (CageSkill.Instance ? 1 : 0); // 회복약 + 새장 + 패시브 아이템
+        float pw = Mathf.Min(640f, W - 40f), rowH = 78f, ph = 150f + rows * rowH + 40f;
         var panel = new Rect((W - pw) * 0.5f, (H - ph) * 0.5f, pw, ph);
         CardDraft.Box(new Rect(panel.x - 3, panel.y - 3, panel.width + 6, panel.height + 6), new Color(1f, 0.85f, 0.4f, 0.85f));
         CardDraft.Box(panel, new Color(0.09f, 0.08f, 0.07f, 0.97f));
@@ -309,7 +308,7 @@ public class GiantHome : MonoBehaviour
         CardDraft.ShadowLabel(new Rect(panel.x, panel.y + 12, pw, 34), "거인의 상점", CardDraft.Style(26, FontStyle.Bold, TextAnchor.MiddleCenter), new Color(1f, 0.85f, 0.4f));
         int money = Money.Instance ? Money.Instance.Amount : 0;
         CardDraft.ShadowLabel(new Rect(panel.x, panel.y + 48, pw, 26), $"가진 돈  {money:N0}", CardDraft.Style(18, FontStyle.Bold, TextAnchor.MiddleCenter), Color.white);
-        string msg = Time.unscaledTime < messageUntil ? message : "클릭 또는 숫자키로 구매   ·   S 저장   ·   E / ESC 닫기";
+        string msg = Time.unscaledTime < messageUntil ? message : "클릭 또는 숫자키로 구매   ·   E / ESC 닫기";
         GUI.color = new Color(1, 1, 1, 0.7f);
         GUI.Label(new Rect(panel.x, panel.y + 76, pw, 22), msg, CardDraft.Style(13, FontStyle.Normal, TextAnchor.MiddleCenter));
         GUI.color = Color.white;
@@ -320,66 +319,65 @@ public class GiantHome : MonoBehaviour
         // 회복약 (소모품, 0번 키)
         {
             var g = GiantHealth.Instance;
-            var r = new Rect(panel.x + 16, y, pw - 32, rowH - 8);
             bool full = !g || g.HP >= g.maxHP;
-            bool afford = money >= potionPrice && !full;
-            CardDraft.Box(r, new Color(0.15f, 0.14f, 0.13f, 1f));
-            CardDraft.Box(new Rect(r.x, r.y, 5, r.height), PotionColor);
-            GUI.color = new Color(1, 1, 1, 0.45f);
-            GUI.Label(new Rect(r.x + 10, r.y, 20, r.height), "0", CardDraft.Style(14, FontStyle.Bold, TextAnchor.MiddleCenter));
-            GUI.color = Color.white;
-            CardDraft.ShadowLabel(new Rect(r.x + 36, r.y + 6, 300, 24), "HP 회복약", CardDraft.Style(18, FontStyle.Bold, TextAnchor.MiddleLeft), PotionColor);
-            GUI.color = new Color(0.8f, 0.8f, 0.85f);
-            GUI.Label(new Rect(r.x + 36, r.y + 30, r.width - 180, 18), g ? $"현재 HP  {Mathf.CeilToInt(g.HP)} / {g.maxHP:0}" : "", CardDraft.Style(12, FontStyle.Normal, TextAnchor.MiddleLeft));
-            GUI.color = new Color(0.55f, 0.9f, 1f);
-            GUI.Label(new Rect(r.x + 36, r.y + 48, r.width - 180, 18), $"즉시 최대 HP의 {potionHealRatio * 100f:0}% 회복 (여러 번 구매 가능)", CardDraft.Style(12, FontStyle.Bold, TextAnchor.MiddleLeft));
-            GUI.color = Color.white;
+            if (ShopRow(new Rect(panel.x + 16, y, pw - 32, rowH - 8), "0", "HP 회복약", PotionColor,
+                    g ? $"현재 HP  {Mathf.CeilToInt(g.HP)} / {g.maxHP:0}" : "", $"즉시 최대 HP의 {potionHealRatio * 100f:0}% 회복 (살 때마다 가격 {potionPriceGrowth:0.#}배)",
+                    full ? "HP 가득" : $"구매  {CurrentPotionPrice:N0}", money >= CurrentPotionPrice, full))
+                TryBuyPotion();
+            y += rowH;
+        }
 
-            var btn = new Rect(r.xMax - 132, r.y + 14, 120, r.height - 28);
-            bool hover = btn.Contains(e.mousePosition);
-            CardDraft.Box(btn, full ? new Color(0.3f, 0.3f, 0.32f) : afford ? (hover ? new Color(1f, 0.8f, 0.35f) : new Color(0.85f, 0.62f, 0.2f)) : new Color(0.35f, 0.25f, 0.2f));
-            GUI.color = afford || full ? Color.white : new Color(1, 1, 1, 0.5f);
-            GUI.Label(btn, full ? "HP 가득" : $"구매  {potionPrice:N0}", CardDraft.Style(15, FontStyle.Bold, TextAnchor.MiddleCenter));
-            GUI.color = Color.white;
-            if (e.type == EventType.MouseDown && e.button == 0 && btn.Contains(e.mousePosition)) { e.Use(); TryBuyPotion(); }
+        // 새장 (1번 키)
+        var cage = CageSkill.Instance;
+        if (cage)
+        {
+            string state = cage.Level == 0 ? "미보유" : $"Lv{cage.Level}  ·  포로 {cage.Count} / {cage.Capacity}명";
+            string effect = cage.Level == 0 ? "적을 죽이면 새장에 가둬 거인 편으로 (탈것은 탑승자)"
+                          : cage.Maxed ? "최대" : $"수용 인원 +{cage.capacityPerLevel}명";
+            if (ShopRow(new Rect(panel.x + 16, y, pw - 32, rowH - 8), "1", "새장", CageColor, state, effect,
+                    cage.Maxed ? "MAX" : $"{(cage.Level == 0 ? "구매" : "강화")}  {cage.Price:N0}", money >= cage.Price, cage.Maxed))
+                TryBuyCage();
             y += rowH;
         }
 
         for (int i = 0; i < n; i++)
         {
             var it = pi.GetEntry(i);
-            var r = new Rect(panel.x + 16, y, pw - 32, rowH - 8);
-            bool afford = money >= it.price && !it.maxed;
-            CardDraft.Box(r, new Color(0.15f, 0.14f, 0.13f, 1f));
-            CardDraft.Box(new Rect(r.x, r.y, 5, r.height), it.color);
-            GUI.color = new Color(1, 1, 1, 0.45f);
-            GUI.Label(new Rect(r.x + 10, r.y, 20, r.height), $"{i + 1}", CardDraft.Style(14, FontStyle.Bold, TextAnchor.MiddleCenter));
-            GUI.color = Color.white;
-            CardDraft.ShadowLabel(new Rect(r.x + 36, r.y + 6, 300, 24), it.name, CardDraft.Style(18, FontStyle.Bold, TextAnchor.MiddleLeft), it.color);
-            GUI.color = new Color(0.8f, 0.8f, 0.85f);
-            GUI.Label(new Rect(r.x + 36, r.y + 30, r.width - 180, 18), it.state, CardDraft.Style(12, FontStyle.Normal, TextAnchor.MiddleLeft));
-            GUI.color = new Color(0.55f, 0.9f, 1f);
-            GUI.Label(new Rect(r.x + 36, r.y + 48, r.width - 180, 18), it.effect, CardDraft.Style(12, FontStyle.Bold, TextAnchor.MiddleLeft));
-            GUI.color = Color.white;
-
-            var btn = new Rect(r.xMax - 132, r.y + 14, 120, r.height - 28);
-            bool hover = btn.Contains(e.mousePosition);
-            CardDraft.Box(btn, it.maxed ? new Color(0.3f, 0.3f, 0.32f) : afford ? (hover ? new Color(1f, 0.8f, 0.35f) : new Color(0.85f, 0.62f, 0.2f)) : new Color(0.35f, 0.25f, 0.2f));
-            GUI.color = afford || it.maxed ? Color.white : new Color(1, 1, 1, 0.5f);
-            GUI.Label(btn, it.maxed ? "MAX" : $"{(it.level == 0 ? "구매" : "강화")}  {it.price:N0}", CardDraft.Style(15, FontStyle.Bold, TextAnchor.MiddleCenter));
-            GUI.color = Color.white;
-            if (e.type == EventType.MouseDown && e.button == 0 && btn.Contains(e.mousePosition)) { e.Use(); TryBuy(i); }
+            if (ShopRow(new Rect(panel.x + 16, y, pw - 32, rowH - 8), $"{i + 1 + (cage ? 1 : 0)}", it.name, it.color, it.state, it.effect,
+                    it.maxed ? "MAX" : $"{(it.level == 0 ? "구매" : "강화")}  {it.price:N0}", money >= it.price, it.maxed))
+                TryBuy(i);
             y += rowH;
         }
 
-        var save = new Rect(panel.x + pw * 0.5f - 148, panel.yMax - 40, 140, 30);
-        CardDraft.Box(save, save.Contains(e.mousePosition) ? new Color(0.35f, 0.8f, 0.5f) : new Color(0.25f, 0.6f, 0.38f));
-        GUI.Label(save, "저장하기 (S)", CardDraft.Style(15, FontStyle.Bold, TextAnchor.MiddleCenter));
-        if (e.type == EventType.MouseDown && e.button == 0 && save.Contains(e.mousePosition)) { e.Use(); SaveNow(); }
-
-        var close = new Rect(panel.x + pw * 0.5f + 8, panel.yMax - 40, 140, 30);
+        var close = new Rect(panel.x + pw * 0.5f - 70, panel.yMax - 40, 140, 30);
         CardDraft.Box(close, close.Contains(e.mousePosition) ? new Color(0.5f, 0.5f, 0.55f) : new Color(0.35f, 0.35f, 0.4f));
         GUI.Label(close, "닫기", CardDraft.Style(15, FontStyle.Bold, TextAnchor.MiddleCenter));
         if (e.type == EventType.MouseDown && e.button == 0 && close.Contains(e.mousePosition)) { e.Use(); Close(); }
+    }
+
+    // 상점 한 줄: 번호 · 이름 · 상태 · 효과 + 오른쪽 버튼. 버튼을 누르면 true (disabled면 회색 버튼, 눌러도 안내 메시지용으로 true)
+    static bool ShopRow(Rect r, string key, string name, Color color, string state, string effect, string button, bool afford, bool disabled)
+    {
+        var e = Event.current;
+        CardDraft.Box(r, new Color(0.15f, 0.14f, 0.13f, 1f));
+        CardDraft.Box(new Rect(r.x, r.y, 5, r.height), color);
+        GUI.color = new Color(1, 1, 1, 0.45f);
+        GUI.Label(new Rect(r.x + 10, r.y, 20, r.height), key, CardDraft.Style(14, FontStyle.Bold, TextAnchor.MiddleCenter));
+        GUI.color = Color.white;
+        CardDraft.ShadowLabel(new Rect(r.x + 36, r.y + 6, 300, 24), name, CardDraft.Style(18, FontStyle.Bold, TextAnchor.MiddleLeft), color);
+        GUI.color = new Color(0.8f, 0.8f, 0.85f);
+        GUI.Label(new Rect(r.x + 36, r.y + 30, r.width - 180, 18), state, CardDraft.Style(12, FontStyle.Normal, TextAnchor.MiddleLeft));
+        GUI.color = new Color(0.55f, 0.9f, 1f);
+        GUI.Label(new Rect(r.x + 36, r.y + 48, r.width - 180, 18), effect, CardDraft.Style(12, FontStyle.Bold, TextAnchor.MiddleLeft));
+        GUI.color = Color.white;
+
+        var btn = new Rect(r.xMax - 132, r.y + 14, 120, r.height - 28);
+        bool ok = afford && !disabled;
+        CardDraft.Box(btn, disabled ? new Color(0.3f, 0.3f, 0.32f) : ok ? (btn.Contains(e.mousePosition) ? new Color(1f, 0.8f, 0.35f) : new Color(0.85f, 0.62f, 0.2f)) : new Color(0.35f, 0.25f, 0.2f));
+        GUI.color = ok || disabled ? Color.white : new Color(1, 1, 1, 0.5f);
+        GUI.Label(btn, button, CardDraft.Style(15, FontStyle.Bold, TextAnchor.MiddleCenter));
+        GUI.color = Color.white;
+        if (e.type == EventType.MouseDown && e.button == 0 && btn.Contains(e.mousePosition)) { e.Use(); return true; }
+        return false;
     }
 }

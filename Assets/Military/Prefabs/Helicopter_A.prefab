@@ -375,10 +375,11 @@ MonoBehaviour:
   startAngle: 0
   smoothTime: 2
   maxSpeed: 70
+  moveSpeedMultiplier: 2
   panicRadius: 90
-  fireInterval: 3.2
-  rocketSpeed: 80
-  damage: 40
+  fireInterval: 2
+  rocketSpeed: 92
+  damage: 52
   homing: 0.55
   contactRadius: 10
 --- !u!1 &5881437396284414908

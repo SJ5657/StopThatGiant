@@ -8,8 +8,8 @@ public class LevelSystem : MonoBehaviour
     public static LevelSystem Instance { get; private set; }
 
     [Header("경험치 곡선")]
-    public int baseXp = 1000;          // 1 → 2레벨에 필요한 경험치
-    public float growth = 1.35f;       // 레벨마다 필요 경험치 증가 배율
+    public int baseXp = 400;           // 1 → 2레벨에 필요한 경험치
+    public float growth = 1.16f;       // 레벨마다 필요 경험치 증가 배율
     public int maxLevel = 99;
     [Tooltip("경험치 획득 배율")] public float xpMultiplier = 1f;
 

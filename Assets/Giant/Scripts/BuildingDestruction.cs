@@ -25,8 +25,8 @@ public class BuildingDestruction : MonoBehaviour
     [Range(0, 1)] public float colorTintFromBuilding = 0f; // 건물 색 반영 비율
 
     [Header("건물 체력 (거인 공격)")]
-    [Tooltip("모든 건물의 기본 체력")] public float hpBase = 150f;
-    [Tooltip("건물 부피(m³)당 추가 체력")] public float hpPerVolume = 1f / 50f;
+    [Tooltip("건물이 무너지기까지 맞아야 하는 횟수 (건물 크기와 상관없이 같음)")] [Min(1)] public int hitsToBreak = 2;
+    [Tooltip("거인 키의 이 비율 이하인 작은 건물은 한 번에 무너짐 (0.15 = 거인 키의 15%)")] [Range(0f, 1f)] public float oneHitHeightRatio = 0.15f;
     [Tooltip("이만큼 떨어져 있다가 다시 닿으면 '새로 지나감'으로 보고 피해 (초)")] public float reTouchGap = 0.3f;
     [Tooltip("계속 닿아 있을 때 반복 피해 간격 (초)")] public float repeatInterval = 1f;
     [Tooltip("다 부서지기 직전 땅으로 꺼지는 정도 (건물 높이 비율)")] [Range(0, 1)] public float maxSink = 0.35f;
@@ -174,12 +174,15 @@ public class BuildingDestruction : MonoBehaviour
         while (t.parent && t.parent.gameObject.layer == building.layer) t = t.parent;
         if (!t.gameObject.activeInHierarchy) return;
 
+        // 거인 키 대비 작은 건물(기본 20% 이하)은 한 번에 무너짐
+        var giant = GiantHealth.Instance;
+        if (giant && giant.Height > 1f && t.lossyScale.y <= giant.Height * Instance.oneHitHeightRatio) { Break(t.gameObject, hitPoint, push); return; }
+
         var hp = t.GetComponent<BuildingHealth>();
         if (!hp)
         {
-            Vector3 s = t.lossyScale;
             hp = t.gameObject.AddComponent<BuildingHealth>();
-            hp.Init(Instance.hpBase + s.x * s.y * s.z * Instance.hpPerVolume);
+            hp.Init(damage * (Instance.hitsToBreak - 0.5f)); // 같은 세기로 hitsToBreak번 맞으면 0 이하
         }
         if (!hp.Touch(damage, hitPoint, push, Instance.reTouchGap, Instance.repeatInterval)) return;
 
@@ -221,6 +224,7 @@ public class BuildingDestruction : MonoBehaviour
             DestroyedCount++;
             ScoreManager.Add(ScoreManager.Instance ? ScoreManager.Instance.buildingPoints : 100);
             Money.AddForBuilding(); // 건물을 부수면 돈 (상점에서 사용)
+            SupplyCrates.OnBuildingBroken(new Vector3(b.transform.position.x, 0f, b.transform.position.z)); // 확률로 보급상자
         }
         if (GiantCamera.Instance) GiantCamera.Instance.Shake(0.25f);
     }

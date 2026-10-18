@@ -86,7 +86,7 @@ public class TankAI : MonoBehaviour
     void Update()
     {
         var g = GiantHealth.Instance;
-        if (!g) return;
+        if (!g || EnemyFreeze.Active) return; // 보급상자 효과: 적 정지
         Vector3 gp = g.transform.position;
         float dist = Flat(transform.position, gp);
 
@@ -198,6 +198,7 @@ public class TankAI : MonoBehaviour
         IsDead = true;
         enabled = false;
         ScoreManager.Add(ScoreManager.Instance ? ScoreManager.Instance.tankPoints : 500, "TANK");
+        CageSkill.Imprison(CageSkill.Kind.Soldier, CageSkill.TankCrew); // 승무원은 새장으로
         CombatFX.Explosion(transform.position + Vector3.up * 3f, 16f);
         CombatFX.Explosion(transform.position + Vector3.up * 1f, 10f);
         Vector3 sc = transform.localScale;

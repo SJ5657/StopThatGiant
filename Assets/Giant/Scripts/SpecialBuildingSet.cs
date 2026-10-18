@@ -49,7 +49,7 @@ public abstract class SpecialBuildingSet : MonoBehaviour
     // 모든 특수 건물이 Awake에서 등록된 뒤에 고르므로 실행 순서와 관계없이 겹치지 않음
     protected virtual void Start()
     {
-        if (ratio <= 0f || SaveGame.Loading) return; // 이어하기면 저장된 자리로 되돌림 (Restore)
+        if (ratio <= 0f) return;
         foreach (var b in Buildings)
             if (b && !IsSpecial(b) && rng.NextDouble() < ratio) Paint(b);
     }

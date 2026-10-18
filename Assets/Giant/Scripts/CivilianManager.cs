@@ -13,7 +13,7 @@ public class CivilianManager : MonoBehaviour
     public CityGenerator city;
 
     [Header("수량 / 범위")]
-    [Tooltip("거인 주변에 유지할 시민 수")] public int maxCivilians = 60;
+    [Tooltip("거인 주변에 유지할 시민 수")] public int maxCivilians = 160;
     [Tooltip("거인으로부터 이 거리 범위의 인도에 생김 (m)")] public Vector2 spawnDistance = new Vector2(80f, 380f);
     [Tooltip("거인과 이만큼 멀어지면 사라짐 (m)")] public float despawnDistance = 600f;
 

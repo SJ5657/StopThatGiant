@@ -40,7 +40,7 @@ public class Money : MonoBehaviour
 
     void OnGUI()
     {
-        if (GameStartMenu.InMenu) return; // 시작 메뉴 중에는 HUD 숨김
+        if (GameStartMenu.InMenu) return; // 시작 메뉴 중에는 HUD 숨김 (돈은 HideHud와 상관없이 항상 표시)
         var s = new GUIStyle(GUI.skin.label) { fontSize = Mathf.RoundToInt(22 + pulse * 4), fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleRight };
         var r = new Rect(Screen.width - 260, 16, 240, 34);
         string text = $"돈  {Mathf.RoundToInt(shown):N0}";

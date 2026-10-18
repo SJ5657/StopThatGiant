@@ -539,14 +539,14 @@ MonoBehaviour:
   - {fileID: 1713790309569843146, guid: 86694b64f46af8042a42203a25c7b5ef, type: 3}
   - {fileID: 988827324429829934, guid: 0e456429e78018242aa5cfd4731504e7, type: 3}
   bombScale: 0.45
-  speed: 140
-  turnRate: 35
+  speed: 265
+  turnRate: 63
   passHeightAboveHead: 25
   egressTime: 6
   bombsPerPass: 2
   bombSpacing: 170
-  lockMinDistance: 650
-  lockMaxDistance: 1150
+  lockMinDistance: 350
+  lockMaxDistance: 600
   bombGravity: 30
   releaseDownSpeed: 5
   contactRadius: 9

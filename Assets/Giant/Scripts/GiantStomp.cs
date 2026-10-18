@@ -88,12 +88,14 @@ public class GiantStomp : MonoBehaviour
             if (tank) tank.Crush();
             var police = hits[i] ? hits[i].GetComponentInParent<PoliceUnit>() : null;
             if (police) police.Crush();
+            var trafficCar = hits[i] ? hits[i].GetComponentInParent<TrafficCar>() : null;
+            if (trafficCar) trafficCar.Crush();
         }
     }
 
     void OnGUI()
     {
-        if (GameStartMenu.InMenu) return; // 시작 메뉴 중에는 HUD 숨김
+        if (GameStartMenu.InMenu || GameStartMenu.HideHud) return; // 시작 메뉴 중이거나 HUD 숨김이면 그리지 않음
         var style = new GUIStyle(GUI.skin.label) { fontSize = 14, fontStyle = FontStyle.Bold };
         var r = new Rect(20, 64, 260, 22);
         GUI.color = new Color(0, 0, 0, 0.7f);

@@ -268687,7 +268687,7 @@ MonoBehaviour:
   - {fileID: 2067998936253723459, guid: e7707aec2cc25b449a610f5087a64251, type: 3}
   locomotion: {fileID: 9100000, guid: 7eb1ed89dc34cba4c8b835881ca20783, type: 2}
   city: {fileID: 1316342897}
-  maxCivilians: 60
+  maxCivilians: 160
   spawnDistance: {x: 80, y: 380}
   despawnDistance: 600
   scale: 1.2
@@ -556356,6 +556356,7 @@ MonoBehaviour:
   mouseSensitivity: 3
   smooth: 10
   minHeightAboveGround: 3
+  screenShake: 0
 --- !u!114 &963194230
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -753252,6 +753253,8 @@ GameObject:
   m_Component:
   - component: {fileID: 1316342898}
   - component: {fileID: 1316342897}
+  - component: {fileID: 1316342899}
+  - component: {fileID: 1316342900}
   m_Layer: 0
   m_Name: City
   m_TagString: Untagged
@@ -753562,6 +753565,58 @@ Transform:
   - {fileID: 165216395}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1316342899
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1316342896}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6ec5b1fcf462e064088a93a001c086e7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  startDistance: 300
+  fullDistance: 900
+  maxRatio: 0.35
+  heightRange: {x: 1, y: 1.5}
+  seed: 777
+  heightBoost: 1.15
+  breakableHeightRatio: 0.5
+  solidLayerName: Default
+  recheckInterval: 0.25
+--- !u!114 &1316342900
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1316342896}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: caaa14ae665b1a6439935efb78d28c4f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  carPrefabs:
+  - {fileID: 100000, guid: a119eb0fa059db34bbaef286c1af1696, type: 3}
+  - {fileID: 100000, guid: 81835658bbd378143a0f525b8552f557, type: 3}
+  - {fileID: 100000, guid: c98da428142c39c42bb62c454958cd1f, type: 3}
+  - {fileID: 100000, guid: 288b117258616aa4f928ba6f91dc47c3, type: 3}
+  - {fileID: 100000, guid: b0ad868427d8c8a4b86144f9786776d3, type: 3}
+  - {fileID: 100000, guid: 00d77ce56096de34eb6645947a0f8925, type: 3}
+  - {fileID: 100000, guid: 05aec82adc02f16409639716322b1673, type: 3}
+  - {fileID: 100000, guid: 93d0d450ec8b42e46b724bf2bbee330b, type: 3}
+  - {fileID: 100000, guid: 81c050d9e127fdd45af1f6b8da476b2b, type: 3}
+  - {fileID: 100000, guid: 9500f0cdde0097a4aac35ced7c1935d7, type: 3}
+  city: {fileID: 1316342897}
+  count: 160
+  carScale: 1.6
+  speedRange: {x: 18, y: 30}
+  spawnRadius: 1100
+  respawnMinDistance: 350
+  despawnDistance: 1500
+  respawnInterval: 0.15
 --- !u!1 &1316428467
 GameObject:
   m_ObjectHideFlags: 0
@@ -808161,11 +808216,10 @@ GameObject:
   m_Component:
   - component: {fileID: 1411558018}
   - component: {fileID: 1411558017}
-  - component: {fileID: 1411558019}
   - component: {fileID: 1411558022}
-  - component: {fileID: 1411558021}
   - component: {fileID: 1411558020}
-  - component: {fileID: 1411558023}
+  - component: {fileID: 1411558025}
+  - component: {fileID: 1411558026}
   m_Layer: 0
   m_Name: ScoreManager
   m_TagString: Untagged
@@ -808204,25 +808258,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1411558019
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1411558016}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 7f9c5a312aa3820478aac976bf3e7f21, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  baseXp: 1500
-  growth: 1.3
-  maxLevel: 99
-  xpMultiplier: 1
-  barWidthRatio: 0.5
-  barHeight: 14
-  bottomMargin: 26
 --- !u!114 &1411558020
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -808252,24 +808287,6 @@ MonoBehaviour:
   factoryPrice: 0
   eatPrice: 0
   priceGrowth: 0.5
---- !u!114 &1411558021
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1411558016}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 108becfef0ef9da4faa5263afc781afa, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  chooseCards: 0
-  autoHp: 100
-  autoSize: 0.03
-  autoAttack: 8
-  maxSizeMultiplier: 2.5
-  growTime: 0.8
 --- !u!114 &1411558022
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -808290,7 +808307,7 @@ MonoBehaviour:
   - 1
   luckPerLevel: 0.04
   inputDelay: 0.4
---- !u!114 &1411558023
+--- !u!114 &1411558025
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -808299,11 +808316,42 @@ MonoBehaviour:
   m_GameObject: {fileID: 1411558016}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f208ef887fec5e147aec8b0a8390af0f, type: 3}
+  m_Script: {fileID: 11500000, guid: 7f9c5a312aa3820478aac976bf3e7f21, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  perBuilding: 10
-  startMoney: 0
+  baseXp: 400
+  growth: 1.16
+  maxLevel: 99
+  xpMultiplier: 1
+  barWidthRatio: 0.5
+  barHeight: 14
+  bottomMargin: 26
+--- !u!114 &1411558026
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1411558016}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8bfbcf28f0b035348a8828c1ee5026d2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  skills:
+  - name: "\uAC70\uB300\uD654"
+    desc: "\uBAB8\uC774 \uD604\uC7AC \uD06C\uAE30\uC758 20%\uB9CC\uD07C \uCEE4\uC9D0.\n\uB2E8\uACC4\uB9C8\uB2E4
+      \uB204\uC801."
+    color: {r: 0.8, g: 0.45, b: 1, a: 1}
+    effect: 1
+    amount: 0.2
+  maxSkillLevel: 99
+  showCards: 0
+  maxHpStep: 100
+  healRatio: 0.3
+  growPerLevel: 0.07
+  maxSizeMultiplier: 0
+  growTime: 0.8
 --- !u!1 &1411768150
 GameObject:
   m_ObjectHideFlags: 0
@@ -861657,9 +861705,9 @@ GameObject:
   - component: {fileID: 1504496839}
   - component: {fileID: 1504496838}
   - component: {fileID: 1504496842}
-  - component: {fileID: 1504496843}
   - component: {fileID: 1504496844}
   - component: {fileID: 1504496845}
+  - component: {fileID: 1504496846}
   m_Layer: 9
   m_Name: Giant
   m_TagString: Untagged
@@ -861709,7 +861757,7 @@ MonoBehaviour:
   gravity: 9.81
   cameraTransform: {fileID: 963194228}
   areaHalfExtent: {x: 1579, y: 1579}
-  startSizeMultiplier: 0.7
+  startSizeMultiplier: 0.63
   externalInput: {x: 0, y: 0}
   externalRun: 0
   scaleCompensation: 1
@@ -861768,29 +861816,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0ce1cec073cfd3a4f84ae3db7549d116, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  maxHP: 1200
+  maxHP: 1000
   testNoDeath: 0
   hpRegen: 0
   damageTakenMultiplier: 1
---- !u!114 &1504496843
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1504496837}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f17700b4dff19cb4fbbdcd013201f24a, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  maxStamina: 200
-  runDrain: 25
-  walkRegen: 10
-  idleRegen: 25
-  regenDelay: 0.8
-  recoverThreshold: 35
-  exhaustedSpeedMultiplier: 0.6
 --- !u!114 &1504496844
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -861833,6 +861862,41 @@ MonoBehaviour:
   gasDuration: 10
   gasDps: 12
   gasMaterial: {fileID: 0}
+--- !u!114 &1504496846
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1504496837}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bc6ca2d50a1a7ae41858a47c0aa48688, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  cageHeight: 0.2
+  cageRadius: 0.11
+  hangOffset: 0.06
+  sideOffset: 0.05
+  bars: 14
+  barThickness: 0.004
+  cageColor: {r: 0.85, g: 0.66, b: 0.25, a: 1}
+  baseCapacity: 3
+  capacityPerLevel: 2
+  maxLevel: 5
+  price: 0
+  priceGrowth: 0.5
+  tankCrew: 2
+  heliCrew: 2
+  jetCrew: 1
+  range: 260
+  fireInterval: 1
+  policeDamage: 3
+  soldierDamage: 5
+  accuracy: 0.75
+  prisonerScale: 0.9
+  policeColor: {r: 0.35, g: 0.45, b: 1, a: 1}
+  soldierColor: {r: 0.45, g: 0.55, b: 0.3, a: 1}
 --- !u!1 &1504602164
 GameObject:
   m_ObjectHideFlags: 0
@@ -929308,9 +929372,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   tankPrefab: {fileID: 9083720051786918546, guid: 5be53965f31bc4943835a02a018bfc34, type: 3}
+  heavyTankPrefab: {fileID: 7955850634019082882, guid: 695119193338ab34da2acfe302aaa000, type: 3}
+  firstHeavyTankAt: 160
+  heavyTankChance: 0.4
   heliPrefabs:
   - {fileID: 4433589060780670016, guid: 93501f54cdf86de4892da34566adfa5f, type: 3}
   - {fileID: 2517979202486040686, guid: 5d41b3110ee1e5f46be6f780924d50ae, type: 3}
+  lateHeliPrefab: {fileID: 4433589060780670016, guid: 93501f54cdf86de4892da34566adfa5f, type: 3}
+  firstLateHeliAt: 250
   jetPrefabs:
   - {fileID: 8808407807438642145, guid: 5e2a76ab9a5d9d54ca46b4fd74b384b7, type: 3}
   - {fileID: 5678306591734392417, guid: fc7f0ed1fed357c478579049305a0ae5, type: 3}
@@ -929330,6 +929399,10 @@ MonoBehaviour:
   firstJetAt: 250
   buildingsPerExtraJet: 120
   maxJets: 4
+  policePerLevel: 0.15
+  tanksPerLevel: 0.25
+  helisPerLevel: 0.15
+  jetsPerLevel: 0.08
   tankSpawnDistance: 420
   heliSpawnDistance: 500
   spawnInterval: 1.5
@@ -931706,8 +931779,8 @@ MonoBehaviour:
   sinkTime: 0.45
   shardColor: {r: 0.3, g: 0.3, b: 0.32, a: 1}
   colorTintFromBuilding: 0
-  hpBase: 150
-  hpPerVolume: 0.02
+  hitsToBreak: 2
+  oneHitHeightRatio: 0.15
   reTouchGap: 0.3
   repeatInterval: 1
   maxSink: 0.35
@@ -931741,24 +931814,19 @@ MonoBehaviour:
   m_GameObject: {fileID: 1623737805}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 268e15a526924cc48bab8e6469645eb8, type: 3}
+  m_Script: {fileID: 11500000, guid: 0fa00b4e02c76df4abbcc7dfa0bca849, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  ratio: 0.006
-  modelPrefab: {fileID: 100000, guid: f6674c1362ba984468bc1e71a2323d66, type: 3}
-  modelFit: 0.95
-  seed: 0
-  color: {r: 0.9, g: 0.13, b: 0.1, a: 1}
-  rollRadius: 350
-  sizeMultiplier: 1.8
-  explodeChance: 1
-  blastRadius: 65
-  explosionSize: 45
-  delay: 0.2
-  shardMultiplier: 0.35
-  markerPrefab: {fileID: 5375370635025587594, guid: 47cc88f39252a6747b055f685e1ed9dd, type: 3}
-  markerSize: 10
-  markerHover: 8
+  dropChance: 0
+  sizeRatio: 0.15
+  lifetime: 60
+  crateColor: {r: 0.25, g: 0.9, b: 0.4, a: 1}
+  healRatio: 1
+  xpBoostSeconds: 60
+  xpBoostMultiplier: 2
+  freezeSeconds: 30
+  runBoostSeconds: 30
+  runBoostMultiplier: 2
 --- !u!1 &1623920992
 GameObject:
   m_ObjectHideFlags: 0
@@ -1225609,66 +1225677,6 @@ Transform:
   - {fileID: 483645677}
   m_Father: {fileID: 165216395}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &2133329759
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 2133329761}
-  - component: {fileID: 2133329760}
-  m_Layer: 0
-  m_Name: GiantHome
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &2133329760
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2133329759}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 4139e5c94182d0440b97dc9cb284aa21, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  housePrefab: {fileID: 100000, guid: 63243ce2fd6113e4384abc2d949cb799, type: 3}
-  houseSizeRatio: 1
-  npcPrefab: {fileID: 0}
-  npcScale: 1.2
-  spawnGiantHere: 1
-  gapFromCity: 80
-  yardSize: {x: 400, y: 400}
-  frontYard: 260
-  wallHeight: 16
-  wallThickness: 5
-  gateWidth: 120
-  wallColor: {r: 0.86, g: 0.8, b: 0.68, a: 1}
-  talkRadius: 2.2
-  potionPrice: 0
-  potionHealRatio: 0.35
-  saveRadius: 2.5
---- !u!4 &2133329761
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2133329759}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &2133347402
 GameObject:
   m_ObjectHideFlags: 0
@@ -1234112,4 +1234120,3 @@ SceneRoots:
   - {fileID: 1411558018}
   - {fileID: 1534904503}
   - {fileID: 475021570}
-  - {fileID: 2133329761}

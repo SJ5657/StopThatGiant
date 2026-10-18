@@ -8,7 +8,7 @@ using UnityEngine;
 public class PoliceUnit : MonoBehaviour
 {
     [Header("이동")]
-    public float moveSpeed = 45f;
+    public float moveSpeed = 52f;
     public float turnSpeed = 240f;
 
     [Header("거인과의 거리 (거인 크기 기준)")]
@@ -18,7 +18,7 @@ public class PoliceUnit : MonoBehaviour
 
     [Header("사격 (경찰 1명 기준)")]
     public float fireInterval = 1f;
-    public float damage = 3f;
+    public float damage = 4f;
     [Range(0, 1)] public float accuracy = 0.6f;
     [Tooltip("방귀 가스(연막) 안에서의 명중률")] [Range(0, 1)] public float smokeAccuracy = 0.12f;
 
@@ -112,6 +112,7 @@ public class PoliceUnit : MonoBehaviour
     void Update()
     {
         var g = GiantHealth.Instance;
+        if (EnemyFreeze.Active) { CrushFrozenOfficers(g); return; } // 보급상자 효과: 적 정지 (밟으면 죽음)
         UpdateOfficers(g);
         if (IsDead || !g || !giant) return;
         float gs = giant.GameScale;
@@ -220,6 +221,20 @@ public class PoliceUnit : MonoBehaviour
         foreach (var o in officers) if (!o.dead && !o.fleeing && o.t) o.inCar = false; // 아직 밖이면 뛰어와서 탐
     }
 
+    // 정지 중에도 거인이 밟으면 경찰은 죽음 (UpdateOfficers의 밟기 판정과 같은 기준)
+    void CrushFrozenOfficers(GiantHealth g)
+    {
+        if (!g) return;
+        float gs = giant ? giant.GameScale : 27f;
+        float squash = (CivilianManager.Instance ? CivilianManager.Instance.squashRadius : 0.3f) * gs;
+        foreach (var o in officers)
+        {
+            if (o.dead || !o.t || !o.t.gameObject.activeSelf) continue;
+            Vector3 toG = g.transform.position - o.t.position; toG.y = 0;
+            if (toG.magnitude < squash) KillOfficer(o, true);
+        }
+    }
+
     void UpdateOfficers(GiantHealth g)
     {
         float dt = Time.deltaTime;
@@ -284,7 +299,7 @@ public class PoliceUnit : MonoBehaviour
     }
 
     // 총알 궤적: 노란 선이 잠깐 번쩍
-    static void Tracer(Vector3 a, Vector3 b)
+    public static void Tracer(Vector3 a, Vector3 b)
     {
         if (!WarningZone.material) return;
         var go = new GameObject("Tracer");
@@ -301,6 +316,13 @@ public class PoliceUnit : MonoBehaviour
     {
         o.dead = true;
         if (!o.t) return;
+        // 새장이 있으면 쓰러지는 대신 새장에 갇힘 (CageSkill)
+        if (CageSkill.Imprison(CageSkill.Kind.Police, 1) > 0)
+        {
+            ScoreManager.Add(officerPoints, "경찰");
+            Destroy(o.t.gameObject);
+            return;
+        }
         if (o.anim) o.anim.enabled = false;
         var s = o.t.localScale;
         o.t.localScale = new Vector3(s.x * 1.4f, s.y * 0.12f, s.z * 1.4f);
@@ -323,14 +345,35 @@ public class PoliceUnit : MonoBehaviour
         foreach (var r in GetComponentsInChildren<Renderer>())
             foreach (var m in r.materials) if (m.HasProperty("_Color")) m.color *= 0.35f;
         foreach (var c in GetComponentsInChildren<Collider>()) c.enabled = false;
+        int aboard = 0;
         foreach (var o in officers)
         {
             if (o.dead) continue;
-            if (o.inCar) { o.dead = true; if (o.t) Destroy(o.t.gameObject); }
+            if (o.inCar) { o.dead = true; aboard++; if (o.t) Destroy(o.t.gameObject); }
             else o.fleeing = true;
         }
+        CageSkill.Imprison(CageSkill.Kind.Police, aboard); // 차 안에 있던 경찰은 새장으로
         if (GiantCamera.Instance) GiantCamera.Instance.Shake(0.3f);
         Destroy(gameObject, 6f);
+    }
+
+    // 새장 포로의 총격: 차에 피해
+    public void TakeDamage(float dmg)
+    {
+        if (IsDead) return;
+        hp -= dmg;
+        if (hp <= 0f) Crush();
+    }
+
+    // 새장 포로가 쏠 수 있는 경찰(차 밖에서 싸우는 중)마다 visit(조준점, 피해 함수)
+    public void VisitOfficers(System.Action<Vector3, System.Action<float>> visit)
+    {
+        foreach (var o in officers)
+        {
+            if (o.dead || o.inCar || o.fleeing || !o.t || !o.t.gameObject.activeSelf) continue;
+            var off = o;
+            visit(o.t.position + Vector3.up * 1.2f * officerScale, d => { if (off.dead) return; off.hp -= d; if (off.hp <= 0f) KillOfficer(off, false); });
+        }
     }
 
     // 방귀 가스: 가스 안에 있는 차·경찰에 피해

@@ -42,7 +42,7 @@ public class ScoreManager : MonoBehaviour
 
     void OnGUI()
     {
-        if (GameStartMenu.InMenu) return; // 시작 메뉴 중에는 HUD 숨김
+        if (GameStartMenu.InMenu || GameStartMenu.HideHud) return; // 시작 메뉴 중이거나 HUD 숨김이면 그리지 않음
         float W = Screen.width;
         var style = new GUIStyle(GUI.skin.label) { fontSize = Mathf.RoundToInt(30 + pulse * 6), fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
         string text = $"SCORE  {Mathf.RoundToInt(displayScore):N0}";

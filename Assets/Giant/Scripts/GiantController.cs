@@ -11,7 +11,7 @@ public class GiantController : MonoBehaviour
     public float gravity = 9.81f;
     public Transform cameraTransform;
     [Tooltip("이동 가능 범위 (0이면 제한 없음)")] public Vector2 areaHalfExtent;
-    [Tooltip("게임 시작 시 거인 크기 배율 (씬에 놓인 모델 크기 기준, 남녀 모델 모두 적용). 속도·발 반경·카메라 등도 함께 비례")] public float startSizeMultiplier = 0.7f;
+    [Tooltip("게임 시작 시 거인 크기 배율 (씬에 놓인 모델 크기 기준, 남녀 모델 모두 적용). 속도·발 반경·카메라 등도 함께 비례")] public float startSizeMultiplier = 0.63f;
 
     [HideInInspector] public Vector2 externalInput;
     [HideInInspector] public bool externalRun;
@@ -22,6 +22,7 @@ public class GiantController : MonoBehaviour
     CharacterController cc;
     Animator anim;
     GiantStamina stamina;
+    Vector3 lastPos; bool hasLastPos;
     float verticalVel, animSpeed;
     // 모델 크기 1당 CharacterController 치수 (크기를 바꿀 때 비례해서 맞춤)
     float ccHeightPer, ccRadiusPer, ccCenterYPer, ccStepPer, ccHeightBase, ccCenterBase;
@@ -101,7 +102,8 @@ public class GiantController : MonoBehaviour
         float scale = GameScale;
         Vector2 input = new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical")) + externalInput;
         input = Vector2.ClampMagnitude(input, 1f);
-        bool wantRun = externalRun || Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
+        // 기본 이동은 달리기, Shift를 누르고 있으면 걷기
+        bool wantRun = externalRun || !(Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift));
         bool boosted = stamina && stamina.Infinite; // 노란 건물 효과: 자동 달리기 + 더 빠르게
         if (boosted) wantRun = true;
 
@@ -137,6 +139,14 @@ public class GiantController : MonoBehaviour
             p.z = Mathf.Clamp(p.z, -areaHalfExtent.y, areaHalfExtent.y);
             if (p != transform.position) { cc.enabled = false; transform.position = p; cc.enabled = true; }
         }
+
+        // 실제로 움직인 속도 (경계에 막히면 0). 전투기 폭격 예측 등에 쓰임
+        if (Time.deltaTime > 0f && hasLastPos)
+        {
+            Vector3 actual = (transform.position - lastPos) / Time.deltaTime; actual.y = 0f;
+            Velocity = actual;
+        }
+        lastPos = transform.position; hasLastPos = true;
 
         float target = !moving ? 0f : (IsRunning ? 1f : 0.5f);
         animSpeed = Mathf.MoveTowards(animSpeed, target, Time.deltaTime * 3f);

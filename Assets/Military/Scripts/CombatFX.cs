@@ -8,7 +8,7 @@ public class CombatFX : MonoBehaviour
     public Material smokeMaterial;     // 알파 블렌드 파티클
     public Material shellMaterial;     // 포탄 몸체
     public Material rocketMaterial;    // 로켓 몸체
-    public Material warningMaterial;   // 폭탄 경고 표시 (버텍스 컬러 + 알파)
+    public Material warningMaterial;   // 버텍스 컬러 + 알파 재질 (총알 궤적·핏자국 등에 공유)
 
     ParticleSystem fire, smoke;
 
@@ -83,11 +83,11 @@ public class CombatFX : MonoBehaviour
         go.name = kind.ToString();
         go.transform.position = pos;
         go.transform.rotation = Quaternion.LookRotation(dir);
-        if (kind == Kind.Shell) go.transform.localScale = Vector3.one * 1.4f;
+        if (kind == Kind.Shell) go.transform.localScale = Vector3.one * 1.9f;
         else
         {
             // 캡슐을 진행방향(z)으로 눕힘
-            var body = go.transform; body.localScale = new Vector3(0.9f, 1.8f, 0.9f);
+            var body = go.transform; body.localScale = new Vector3(1.2f, 2.4f, 1.2f);
             var holder = new GameObject("Rocket").transform;
             holder.SetPositionAndRotation(pos, Quaternion.LookRotation(dir));
             body.SetParent(holder, true);
@@ -104,7 +104,7 @@ public class CombatFX : MonoBehaviour
         var tr = trailGo.AddComponent<TrailRenderer>();
         if (kind == Kind.Shell)
         {
-            tr.time = 0.25f; tr.startWidth = 1.4f; tr.endWidth = 0f;
+            tr.time = 0.25f; tr.startWidth = 1.9f; tr.endWidth = 0f;
             tr.startColor = new Color(1f, 0.85f, 0.4f, 1f); tr.endColor = new Color(1f, 0.4f, 0.1f, 0f);
             if (fx) tr.sharedMaterial = fx.fireMaterial;
         }
@@ -119,6 +119,7 @@ public class CombatFX : MonoBehaviour
 
         var p = go.AddComponent<Projectile>();
         p.Launch(dir * speed, damage, homing, kind == Kind.Shell ? 6f : 9f, tr);
+        ThreatGlow.Add(go.transform, kind == Kind.Shell ? 18f : 22f); // 날아오는 것을 알아볼 수 있게 붉은 후광
         return p;
     }
 }

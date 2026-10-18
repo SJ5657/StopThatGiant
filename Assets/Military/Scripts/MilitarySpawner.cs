@@ -8,7 +8,12 @@ using UnityEngine;
 public class MilitarySpawner : MonoBehaviour
 {
     public GameObject tankPrefab;
+    [Tooltip("중전차 (Tank 7): 일반 탱크보다 이동·포탄 속도가 빠름")] public GameObject heavyTankPrefab;
+    [Tooltip("이만큼 부순 뒤부터 중전차가 나옴 (일반 탱크가 먼저 나오는 firstTankAt보다 커야 함)")] public int firstHeavyTankAt = 160;
+    [Tooltip("중전차가 나올 수 있게 된 뒤, 탱크를 투입할 때 중전차가 나올 확률")] [Range(0f, 1f)] public float heavyTankChance = 0.4f;
     public GameObject[] heliPrefabs;
+    [Tooltip("heliPrefabs 중 늦게 등장하는 헬기 (Helicopter 1). 이 헬기는 firstLateHeliAt만큼 부순 뒤부터만 나옴")] public GameObject lateHeliPrefab;
+    [Tooltip("이만큼 부순 뒤부터 늦게 나오는 헬기도 섞여 나옴")] public int firstLateHeliAt = 250;
     public GameObject[] jetPrefabs;
     public CityGenerator city;
 
@@ -34,6 +39,13 @@ public class MilitarySpawner : MonoBehaviour
     public int firstJetAt = 250;
     public int buildingsPerExtraJet = 120;
     public int maxJets = 4;
+
+    [Header("레벨업 보너스 (레벨이 오를수록 더 많이 등장)")]
+    [Tooltip("레벨이 1 오를 때마다 늘어나는 수 (소수는 누적해서 정수가 될 때마다 +1). 최대 수도 같은 만큼 늘어남")]
+    public float policePerLevel = 0.15f;
+    public float tanksPerLevel = 0.25f;
+    public float helisPerLevel = 0.15f;
+    public float jetsPerLevel = 0.08f;
 
     [Header("스폰")]
     public float tankSpawnDistance = 420f;
@@ -62,15 +74,17 @@ public class MilitarySpawner : MonoBehaviour
     }
 
     int Destroyed => BuildingDestruction.Instance ? BuildingDestruction.Instance.DestroyedCount : 0;
-    public int WantedTanks => Destroyed < firstTankAt ? 0 : Mathf.Min(maxTanks, 1 + (Destroyed - firstTankAt) / buildingsPerExtraTank);
-    public int WantedHelis => Destroyed < firstHeliAt ? 0 : Mathf.Min(maxHelis, 1 + (Destroyed - firstHeliAt) / buildingsPerExtraHeli);
-    public int WantedJets => Destroyed < firstJetAt ? 0 : Mathf.Min(maxJets, 1 + (Destroyed - firstJetAt) / buildingsPerExtraJet);
-    public int WantedPolice => Mathf.Min(maxPolice, startPolice + Destroyed / Mathf.Max(1, buildingsPerExtraPolice));
+    // 레벨업 보너스: (레벨 - 1) × 레벨당 증가량. 종류별 등장 조건(부순 건물 수)을 넘긴 뒤부터 적용
+    int LevelBonus(float perLevel) => Mathf.FloorToInt((LevelSystem.Instance ? LevelSystem.Instance.Level - 1 : 0) * perLevel);
+    public int WantedTanks => Destroyed < firstTankAt ? 0 : Mathf.Min(maxTanks, 1 + (Destroyed - firstTankAt) / buildingsPerExtraTank) + LevelBonus(tanksPerLevel);
+    public int WantedHelis => Destroyed < firstHeliAt ? 0 : Mathf.Min(maxHelis, 1 + (Destroyed - firstHeliAt) / buildingsPerExtraHeli) + LevelBonus(helisPerLevel);
+    public int WantedJets => Destroyed < firstJetAt ? 0 : Mathf.Min(maxJets, 1 + (Destroyed - firstJetAt) / buildingsPerExtraJet) + LevelBonus(jetsPerLevel);
+    public int WantedPolice => Mathf.Min(maxPolice, startPolice + Destroyed / Mathf.Max(1, buildingsPerExtraPolice)) + LevelBonus(policePerLevel);
 
     void Update()
     {
         var g = GiantHealth.Instance;
-        if (!g || g.IsDead) return;
+        if (!g || g.IsDead || EnemyFreeze.Active) return; // 보급상자 효과 중에는 새 적도 투입하지 않음
         tanks.RemoveAll(t => !t || t.IsDead);
         helis.RemoveAll(h => !h || h.IsDead);
         jets.RemoveAll(j => !j || j.IsDead);
@@ -99,6 +113,25 @@ public class MilitarySpawner : MonoBehaviour
         else if (tanks.Count < wt) { SpawnTank(g); nextSpawn = Time.time + spawnInterval; }
         else if (helis.Count < wh) { SpawnHeli(g); nextSpawn = Time.time + spawnInterval; }
         else if (jets.Count < wj) { SpawnJet(g); nextSpawn = Time.time + spawnInterval * 2f; }
+    }
+
+    // 거인 편(새장 포로, CageSkill)이 쏠 적 찾기: from에서 range 안의 가장 가까운 적과 그 적에게 피해를 주는 함수.
+    // 해산 중인 적은 목록에서 빠져 있으므로 쏘지 않음
+    public bool FindTarget(Vector3 from, float range, out Vector3 aim, out System.Action<float> hit)
+    {
+        float best = range * range;
+        Vector3 bestAim = default; System.Action<float> bestHit = null;
+        void Consider(Vector3 p, System.Action<float> h)
+        {
+            float d = (p - from).sqrMagnitude;
+            if (d < best) { best = d; bestAim = p; bestHit = h; }
+        }
+        foreach (var p in police) if (p && !p.IsDead) { Consider(p.transform.position + Vector3.up * 1.5f, p.TakeDamage); p.VisitOfficers(Consider); }
+        foreach (var t in tanks) if (t && !t.IsDead) Consider(t.transform.position + Vector3.up * 2f, t.TakeDamage);
+        foreach (var h in helis) if (h && !h.IsDead) Consider(h.transform.position, h.TakeDamage);
+        foreach (var j in jets) if (j && !j.IsDead) Consider(j.transform.position, j.TakeDamage);
+        aim = bestAim; hit = bestHit;
+        return bestHit != null;
     }
 
     // 남아 있는 적을 모두 해산시키고 목록에서 뺌 (해산 중인 유닛은 수량에 세지 않음)
@@ -143,8 +176,9 @@ public class MilitarySpawner : MonoBehaviour
             if (d.magnitude > tankSpawnDistance * 0.6f) break;
         }
         Vector3 look = g.transform.position - pos; look.y = 0;
-        var go = Instantiate(tankPrefab, pos, Quaternion.LookRotation(look.sqrMagnitude > 1 ? look : Vector3.forward), transform);
-        go.name = "Tank";
+        bool heavy = heavyTankPrefab && Destroyed >= firstHeavyTankAt && Random.value < heavyTankChance;
+        var go = Instantiate(heavy ? heavyTankPrefab : tankPrefab, pos, Quaternion.LookRotation(look.sqrMagnitude > 1 ? look : Vector3.forward), transform);
+        go.name = heavy ? "HeavyTank" : "Tank";
         var ai = go.GetComponent<TankAI>();
         ai.city = city;
         tanks.Add(ai);
@@ -191,20 +225,30 @@ public class MilitarySpawner : MonoBehaviour
         police.Add(ai);
     }
 
+    // 헬기 모델 고르기: 늦게 나오는 헬기(lateHeliPrefab)는 firstLateHeliAt 이후에만 후보에 넣음
+    GameObject PickHeliPrefab()
+    {
+        var pool = new List<GameObject>();
+        foreach (var h in heliPrefabs)
+            if (h && (h != lateHeliPrefab || Destroyed >= firstLateHeliAt)) pool.Add(h);
+        if (pool.Count == 0) pool.AddRange(heliPrefabs); // 늦은 헬기만 등록돼 있어도 아예 안 나오지는 않게
+        return pool[Random.Range(0, pool.Count)];
+    }
+
     void SpawnHeli(GiantHealth g)
     {
         if (heliPrefabs == null || heliPrefabs.Length == 0) return;
         float a = Random.Range(0f, 360f);
         Vector3 dir = new Vector3(Mathf.Cos(a * Mathf.Deg2Rad), 0, Mathf.Sin(a * Mathf.Deg2Rad));
         Vector3 pos = g.transform.position + dir * heliSpawnDistance + Vector3.up * g.ShoulderY * 0.9f;
-        var go = Instantiate(heliPrefabs[Random.Range(0, heliPrefabs.Length)], pos, Quaternion.LookRotation(-dir), transform);
+        var go = Instantiate(PickHeliPrefab(), pos, Quaternion.LookRotation(-dir), transform);
         go.name = "Helicopter";
         var ai = go.GetComponent<HeliAI>();
         ai.startAngle = a;
         ai.direction = Random.value < 0.5f ? 1f : -1f;
         ai.orbitRadius = Random.Range(130f, 200f);
         ai.altitude = g.ShoulderY * Random.Range(0.65f, 1f); // 어깨 높이 이하
-        ai.angularSpeed = Random.Range(9f, 15f);
+        ai.angularSpeed = Random.Range(9f, 15f); // 실제 선회 속도는 HeliAI가 moveSpeedMultiplier를 곱함
         helis.Add(ai);
     }
 

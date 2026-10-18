@@ -1,7 +1,7 @@
 using UnityEngine;
 
 // 사선 탑뷰 카메라: 위에서 비스듬히 내려다보며 거인을 따라감.
-// 마우스 좌우로 주변을 돌 수 있고, 내려다보는 각도(pitch)는 고정. 휠 줌, 화면 흔들림.
+// 마우스 좌우로 주변을 돌 수 있고, 내려다보는 각도(pitch)와 거리는 고정(휠 줌 없음). 화면 흔들림.
 // Esc 커서 해제 / 클릭 잠금 (커서가 잠겨 있을 때만 마우스로 시점 회전).
 public class GiantCamera : MonoBehaviour
 {
@@ -23,7 +23,9 @@ public class GiantCamera : MonoBehaviour
     void Start() { Lock(true); }
     void Lock(bool l) { Cursor.lockState = l ? CursorLockMode.Locked : CursorLockMode.None; Cursor.visible = !l; }
 
-    public void Shake(float amount) { shake = Mathf.Min(shake + amount, 2.5f); }
+    [Tooltip("켜면 폭발·피해 때 화면이 흔들림 (기본 꺼짐)")] public bool screenShake = false;
+
+    public void Shake(float amount) { if (screenShake) shake = Mathf.Min(shake + amount, 2.5f); }
 
     void LateUpdate()
     {
@@ -35,7 +37,7 @@ public class GiantCamera : MonoBehaviour
         if (Input.GetMouseButtonDown(0) && !CardDraft.IsOpen) Lock(true); // 카드 고르는 클릭은 무시
         if (Cursor.lockState == CursorLockMode.Locked)
             yaw += Input.GetAxis("Mouse X") * mouseSensitivity;
-        distance = Mathf.Clamp(distance - Input.mouseScrollDelta.y * 0.4f, minDistance, maxDistance);
+        // 마우스 휠로 거리(시야 범위)를 바꾸지 않음: distance는 인스펙터 값으로 고정
 
         if (!gc) gc = target.GetComponentInParent<GiantController>();
         float s = gc ? gc.GameScale : target.lossyScale.y; // 성별 무관 동일한 카메라 거리

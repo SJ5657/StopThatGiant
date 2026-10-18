@@ -45,7 +45,7 @@ public class DigestGauge : MonoBehaviour
 
     void OnGUI()
     {
-        if (GameStartMenu.InMenu || !Visible) return;
+        if (GameStartMenu.InMenu || GameStartMenu.HideHud || !Visible) return;
         // 공격력 표시 오른쪽
         float x = 150f, y = 69f, w = 130f, h = 10f;
         GUI.color = new Color(0, 0, 0, 0.6f);

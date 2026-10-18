@@ -5,7 +5,7 @@ using UnityEngine.SceneManagement;
 public class GiantHealth : MonoBehaviour
 {
     public static GiantHealth Instance { get; private set; }
-    public float maxHP = 1200f;
+    public float maxHP = 1000f;
     [Tooltip("테스트용: 켜면 HP가 0이 되어도 죽지 않음")] public bool testNoDeath = false;
     [Header("능력치")]
     [Tooltip("초당 HP 자동 회복량")] public float hpRegen = 0f;
@@ -46,6 +46,9 @@ public class GiantHealth : MonoBehaviour
     // 어깨 높이(월드 Y). 헬기·전투기 비행 고도에 사용.
     // 모델 뼈 대신 충돌 캡슐 기준으로 계산해서 남자/여자 거인이 완전히 같은 값이 되게 함.
     public float ShoulderY => transform.position.y + cc.height * 0.837f;
+
+    // 거인 키(월드 m): 충돌 캡슐 높이. 남자/여자 거인이 같은 값
+    public float Height => cc ? cc.height : 0f;
 
     public Transform Bone(HumanBodyBones b) => anim && anim.isHuman ? anim.GetBoneTransform(b) : null;
 
