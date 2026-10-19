@@ -84,7 +84,7 @@ public class MilitarySpawner : MonoBehaviour
     void Update()
     {
         var g = GiantHealth.Instance;
-        if (!g || g.IsDead || EnemyFreeze.Active) return; // 보급상자 효과 중에는 새 적도 투입하지 않음
+        if (!g || g.IsDead || EnemyFreeze.Active || Time.time < retreatUntil) return; // 보급상자 정지·인질 구출 후퇴 중에는 새 적도 투입하지 않음
         tanks.RemoveAll(t => !t || t.IsDead);
         helis.RemoveAll(h => !h || h.IsDead);
         jets.RemoveAll(j => !j || j.IsDead);
@@ -132,6 +132,16 @@ public class MilitarySpawner : MonoBehaviour
         foreach (var j in jets) if (j && !j.IsDead) Consider(j.transform.position, j.TakeDamage);
         aim = bestAim; hit = bestHit;
         return bestHit != null;
+    }
+
+    // 인질 구출 보상: 남은 적을 모두 물러나게 하고 seconds초 동안 새 적도 투입하지 않음
+    float retreatUntil;
+    public static float RetreatLeft => Instance ? Mathf.Max(0f, Instance.retreatUntil - Time.time) : 0f;
+    public static void Retreat(float seconds)
+    {
+        if (!Instance) return;
+        Instance.DisperseAll();
+        Instance.retreatUntil = Time.time + seconds;
     }
 
     // 남아 있는 적을 모두 해산시키고 목록에서 뺌 (해산 중인 유닛은 수량에 세지 않음)

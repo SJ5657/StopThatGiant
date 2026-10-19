@@ -5,7 +5,7 @@ using UnityEngine.SceneManagement;
 public class GiantHealth : MonoBehaviour
 {
     public static GiantHealth Instance { get; private set; }
-    public float maxHP = 1000f;
+    public float maxHP = 300f;
     [Tooltip("테스트용: 켜면 HP가 0이 되어도 죽지 않음")] public bool testNoDeath = false;
     [Header("능력치")]
     [Tooltip("초당 HP 자동 회복량")] public float hpRegen = 0f;
@@ -151,9 +151,26 @@ public class GiantHealth : MonoBehaviour
             SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
     }
 
+    // 거인 머리 위에 작게 표시하는 HP 바
+    void DrawOverheadBar()
+    {
+        var cam = Camera.main;
+        if (!cam || !cc || IsDead) return;
+        Vector3 sp = cam.WorldToScreenPoint(transform.position + Vector3.up * (cc.height + 1f));
+        if (sp.z <= 0f) return;
+        float w = 70, h = 8;
+        float x = sp.x - w * 0.5f, y = Screen.height - sp.y - h - 4f;
+        GUI.color = new Color(0, 0, 0, 0.6f);
+        GUI.DrawTexture(new Rect(x - 1, y - 1, w + 2, h + 2), Texture2D.whiteTexture);
+        GUI.color = hitFlash > 0 ? new Color(1f, 0.9f, 0.9f) : new Color(0.9f, 0.2f, 0.25f);
+        GUI.DrawTexture(new Rect(x, y, w * Mathf.Clamp01(HP / maxHP), h), Texture2D.whiteTexture);
+        GUI.color = Color.white;
+    }
+
     void OnGUI()
     {
         if (GameStartMenu.InMenu) return; // 시작 메뉴 중에는 HUD 숨김
+        DrawOverheadBar();
         float w = 260, h = 20, x = 20, y = 20;
         GUI.color = new Color(0, 0, 0, 0.6f);
         GUI.DrawTexture(new Rect(x - 3, y - 3, w + 6, h + 6), Texture2D.whiteTexture);

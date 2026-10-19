@@ -63,7 +63,7 @@ public class GiantEat : MonoBehaviour
         switch (phase)
         {
             case Phase.None:
-                if (unlocked && !ctrl.IsRunning && Time.time >= nextAt && (!GiantHealth.Instance || !GiantHealth.Instance.IsDead)) TryGrab();
+                if (unlocked && !ctrl.IsRunning && !HostageEvent.HandBusy && Time.time >= nextAt && (!GiantHealth.Instance || !GiantHealth.Instance.IsDead)) TryGrab();
                 break;
             case Phase.Reach:
                 if (!target) { Begin(Phase.Return); break; } // 잡기 전에 사라짐

@@ -1587,7 +1587,7 @@ MonoBehaviour:
   turretTurnSpeed: 90
   fireInterval: 2.6
   shellSpeed: 235
-  damage: 85
+  damage: 110
   spread: 7
   maxHP: 60
   repositionAfter: 1.5

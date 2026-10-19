@@ -15,6 +15,7 @@ public class GiantController : MonoBehaviour
 
     [HideInInspector] public Vector2 externalInput;
     [HideInInspector] public bool externalRun;
+    [HideInInspector] public bool inputLocked;
 
     public bool IsRunning { get; private set; }
     public Vector3 Velocity { get; private set; }
@@ -102,6 +103,7 @@ public class GiantController : MonoBehaviour
         float scale = GameScale;
         Vector2 input = new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical")) + externalInput;
         input = Vector2.ClampMagnitude(input, 1f);
+        if (inputLocked) input = Vector2.zero; // 인질 줍기 동작 중 등: 이동 입력 무시 (제자리에서 가만히 서서 동작)
         // 기본 이동은 달리기, Shift를 누르고 있으면 걷기
         bool wantRun = externalRun || !(Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift));
         bool boosted = stamina && stamina.Infinite; // 노란 건물 효과: 자동 달리기 + 더 빠르게

@@ -379,7 +379,7 @@ MonoBehaviour:
   panicRadius: 90
   fireInterval: 2
   rocketSpeed: 92
-  damage: 52
+  damage: 68
   homing: 0.55
   contactRadius: 10
 --- !u!1 &5881437396284414908

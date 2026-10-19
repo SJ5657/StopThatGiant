@@ -225,6 +225,7 @@ public class BuildingDestruction : MonoBehaviour
             ScoreManager.Add(ScoreManager.Instance ? ScoreManager.Instance.buildingPoints : 100);
             Money.AddForBuilding(); // 건물을 부수면 돈 (상점에서 사용)
             SupplyCrates.OnBuildingBroken(new Vector3(b.transform.position.x, 0f, b.transform.position.z)); // 확률로 보급상자
+            HostageEvent.OnBuildingBroken(new Vector3(b.transform.position.x, 0f, b.transform.position.z)); // 확률로 인질 이벤트
         }
         if (GiantCamera.Instance) GiantCamera.Instance.Shake(0.25f);
     }

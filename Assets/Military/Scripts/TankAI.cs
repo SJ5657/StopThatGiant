@@ -188,7 +188,7 @@ public class TankAI : MonoBehaviour
         var want = Quaternion.LookRotation(to);
         transform.rotation = Quaternion.RotateTowards(transform.rotation, want, turnSpeed * Time.deltaTime);
         if (Quaternion.Angle(transform.rotation, want) < 25f)
-            transform.position = Vector3.MoveTowards(transform.position, target, moveSpeed * Time.deltaTime);
+            transform.position = Vector3.MoveTowards(transform.position, target, moveSpeed * ChaseBoost.Factor(transform.position) * Time.deltaTime);
     }
 
     // 거인에게 밟힘: 폭발 + 납작하게 찌그러진 잔해로 남았다가 사라짐

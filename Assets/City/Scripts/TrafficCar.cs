@@ -9,6 +9,12 @@ public class TrafficCar : MonoBehaviour
     public float turnSpeed = 220f;
     [Tooltip("도로 가운데에서 오른쪽으로 떨어진 거리 (m)")] public float laneOffset = 3.5f;
 
+    [Tooltip("켜면 교차로마다 거인에게서 가장 멀어지는 길을 골라 도망감 (인질 이벤트 차량)")] public bool flee;
+
+    float emergeT = 1f, emergeTime; Vector3 emergeFrom;
+    // Init 다음에 부름: 이 자리(부서진 건물)에서 출발해 emergeTime초 동안 도로로 빠져나옴
+    public void EmergeFrom(Vector3 from, float time) { emergeFrom = from; emergeTime = time; emergeT = 0f; transform.position = from; }
+
     public bool IsDead { get; private set; }
 
     Vector3 gridOrigin; float pitch; int maxI, maxJ;
@@ -47,6 +53,12 @@ public class TrafficCar : MonoBehaviour
         if (opts.Count > 1) opts.RemoveAll(o => o.x == prevI && o.y == prevJ);
         if (opts.Count == 0) { ti = ci; tj = cj; return; }
         var n = opts[Random.Range(0, opts.Count)];
+        var giant = flee ? GiantHealth.Instance : null;
+        if (giant)
+        {
+            float best = -1f; Vector3 gp = giant.transform.position; gp.y = 0f;
+            foreach (var o in opts) { float d = (Node(o.x, o.y) - gp).sqrMagnitude; if (d > best) { best = d; n = o; } }
+        }
         ti = n.x; tj = n.y; t = 0f;
     }
 
@@ -68,6 +80,13 @@ public class TrafficCar : MonoBehaviour
         offset = Vector3.MoveTowards(offset, Right(dir) * laneOffset, 14f * Time.deltaTime);
         Vector3 pos = Vector3.Lerp(a, b, t) + offset;
         pos.y = transform.position.y;
+        if (emergeT < 1f) // 건물 자리에서 도로로 빠져나오는 중
+        {
+            emergeT += Time.deltaTime / Mathf.Max(0.1f, emergeTime);
+            float k = Mathf.Clamp01(emergeT); k = k * k * (3f - 2f * k);
+            Vector3 from = emergeFrom; from.y = pos.y;
+            pos = Vector3.Lerp(from, pos, k);
+        }
         transform.position = pos;
         transform.rotation = Quaternion.RotateTowards(transform.rotation, Quaternion.LookRotation(dir), turnSpeed * Time.deltaTime);
     }

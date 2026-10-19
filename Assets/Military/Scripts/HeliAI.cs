@@ -108,7 +108,7 @@ public class HeliAI : MonoBehaviour
             desired += flat.normalized * (panicRadius - flat.magnitude) * 2f;
 
         Vector3 prev = transform.position;
-        transform.position = Vector3.SmoothDamp(transform.position, desired, ref vel, smoothTime, maxSpeed * moveSpeedMultiplier);
+        transform.position = Vector3.SmoothDamp(transform.position, desired, ref vel, smoothTime, maxSpeed * moveSpeedMultiplier * ChaseBoost.Factor(transform.position));
 
         // 기수는 거인을 향하고, 이동 방향에 따라 기울기
         Vector3 look = c + Vector3.up * altitude * 0.7f - transform.position; look.y = 0;

@@ -560637,7 +560637,10 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: -1728013695380148634, guid: 8a3348cd69b7db64f8b37a5b72e7238b, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 969947695}
   m_SourcePrefab: {fileID: -3956505258223990651, guid: 8a3348cd69b7db64f8b37a5b72e7238b, type: 3}
 --- !u!4 &969947690 stripped
 Transform:
@@ -560649,6 +560652,20 @@ GameObject:
   m_CorrespondingSourceObject: {fileID: -1728013695380148634, guid: 8a3348cd69b7db64f8b37a5b72e7238b, type: 3}
   m_PrefabInstance: {fileID: 969947689}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &969947695
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 969947691}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 71bd2df0c568e4b4db4ee46638d28e2b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  jiggle: 0.3
+  boneNameContains: Bust
 --- !u!1 &970088588
 GameObject:
   m_ObjectHideFlags: 0
@@ -808347,9 +808364,9 @@ MonoBehaviour:
     amount: 0.2
   maxSkillLevel: 99
   showCards: 0
-  maxHpStep: 100
+  maxHpStep: 50
   healRatio: 0.3
-  growPerLevel: 0.07
+  growPerLevel: 0.05
   maxSizeMultiplier: 0
   growTime: 0.8
 --- !u!1 &1411768150
@@ -861760,6 +861777,7 @@ MonoBehaviour:
   startSizeMultiplier: 0.63
   externalInput: {x: 0, y: 0}
   externalRun: 0
+  inputLocked: 0
   scaleCompensation: 1
 --- !u!143 &1504496840
 CharacterController:
@@ -861816,7 +861834,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0ce1cec073cfd3a4f84ae3db7549d116, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  maxHP: 1000
+  maxHP: 300
   testNoDeath: 0
   hpRegen: 0
   damageTakenMultiplier: 1
@@ -931745,6 +931763,7 @@ GameObject:
   - component: {fileID: 1623737807}
   - component: {fileID: 1623737806}
   - component: {fileID: 1623737808}
+  - component: {fileID: 1623737809}
   m_Layer: 0
   m_Name: DestructionManager
   m_TagString: Untagged
@@ -931827,6 +931846,49 @@ MonoBehaviour:
   freezeSeconds: 30
   runBoostSeconds: 30
   runBoostMultiplier: 2
+--- !u!114 &1623737809
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1623737805}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 117cff0b53d32ef4f868ad9c3a7718df, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  eventChance: 0.05
+  cooldown: 30
+  hostagePrefab: {fileID: -1728013695380148634, guid: c4928ece714f93b4cbbed9ad8c797a35, type: 3}
+  carScale: 2.2
+  carSpeedRatio: 0.92
+  graceTime: 3
+  chaseTime: 90
+  pickRangeRatio: 0.35
+  hostageHeightRatio: 0.07
+  destDistancePerHeight: 18
+  destDistanceClamp: {x: 350, y: 800}
+  arriveRatio: 0.6
+  rescueScore: 500
+  xpBoostSeconds: 30
+  retreatSeconds: 20
+  settleTime: 0.35
+  reachTime: 0.5
+  liftTime: 0.6
+  releaseTime: 0.6
+  crouchDepth: 0.12
+  leanAngle: 55
+  helpText: Help Me!
+  struggle: 1
+  pipSize: 240
+  ikRotOffsetEuler: {x: 0, y: 90, z: 0}
+  curlSign: -1
+  gripStrength: 1
+  gripDepth: 0.2
+  gripHeight: 0.55
+  thumbOpposeDeg: 30
+  thumbCurlDeg: -40
 --- !u!1 &1623920992
 GameObject:
   m_ObjectHideFlags: 0

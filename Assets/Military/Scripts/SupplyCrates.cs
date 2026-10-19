@@ -133,12 +133,16 @@ public class SupplyCrates : MonoBehaviour
         }
     }
 
-    void StartXpBoost()
+    // 인질 구출 보상 등 밖에서 쓰는 도우미 (경험치 배율 + 알림 문구)
+    public static void GiveXpBoost(float seconds) { if (Instance) Instance.StartXpBoost(seconds); }
+    public static void Notice(string text) { if (Instance) Instance.Show(text); }
+
+    void StartXpBoost(float seconds = -1f)
     {
         var ls = LevelSystem.Instance;
         if (!ls) return;
         if (!xpBoosting) { xpTarget = ls; ls.xpMultiplier *= xpBoostMultiplier; xpBoosting = true; }
-        xpBoostUntil = Time.time + xpBoostSeconds; // 이미 적용 중이면 시간만 새로 채움
+        xpBoostUntil = Time.time + (seconds > 0f ? seconds : xpBoostSeconds); // 이미 적용 중이면 시간만 새로 채움
     }
 
     void EndXpBoost()
@@ -182,7 +186,8 @@ public class SupplyCrates : MonoBehaviour
         float y = Screen.height * 0.2f + 44f;
         if (xpBoosting) y = DrawTimer($"경험치 {xpBoostMultiplier:0.#}배  {Mathf.Max(0f, xpBoostUntil - Time.time):0}s", y, small);
         if (runBoosting) y = DrawTimer($"달리기 {runBoostMultiplier:0.#}배  {Mathf.Max(0f, runBoostUntil - Time.time):0}s", y, small);
-        if (EnemyFreeze.Active) DrawTimer($"적 정지  {EnemyFreeze.Left:0}s", y, small);
+        if (EnemyFreeze.Active) y = DrawTimer($"적 정지  {EnemyFreeze.Left:0}s", y, small);
+        if (MilitarySpawner.RetreatLeft > 0f) DrawTimer($"적 후퇴  {MilitarySpawner.RetreatLeft:0}s", y, small);
         GUI.color = Color.white;
     }
 

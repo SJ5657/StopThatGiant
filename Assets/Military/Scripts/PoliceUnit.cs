@@ -18,7 +18,7 @@ public class PoliceUnit : MonoBehaviour
 
     [Header("사격 (경찰 1명 기준)")]
     public float fireInterval = 1f;
-    public float damage = 4f;
+    public float damage = 5f;
     [Range(0, 1)] public float accuracy = 0.6f;
     [Tooltip("방귀 가스(연막) 안에서의 명중률")] [Range(0, 1)] public float smokeAccuracy = 0.12f;
 
@@ -195,7 +195,7 @@ public class PoliceUnit : MonoBehaviour
         var want = Quaternion.LookRotation(to);
         transform.rotation = Quaternion.RotateTowards(transform.rotation, want, turnSpeed * Time.deltaTime);
         if (Quaternion.Angle(transform.rotation, want) < 30f)
-            transform.position = Vector3.MoveTowards(transform.position, target, moveSpeed * Time.deltaTime);
+            transform.position = Vector3.MoveTowards(transform.position, target, moveSpeed * ChaseBoost.Factor(transform.position) * Time.deltaTime);
     }
 
     // ───────────── 경찰 ─────────────

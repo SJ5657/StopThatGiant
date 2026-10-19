@@ -39,9 +39,9 @@ public class SkillCards : MonoBehaviour
 
     [Header("레벨업 방식")]
     [Tooltip("켜면 레벨업마다 스킬 카드 3장 중 고르기, 끄면 아래 보상이 자동으로 적용됨")] public bool showCards = false;
-    [Tooltip("자동 보상: 레벨업마다 늘어나는 최대 HP (늘어난 만큼 바로 채워짐)")] public float maxHpStep = 100f;
+    [Tooltip("자동 보상: 레벨업마다 늘어나는 최대 HP (늘어난 만큼 바로 채워짐)")] public float maxHpStep = 50f;
     [Tooltip("자동 보상: 레벨업마다 회복하는 HP (최대 HP 대비 비율)")] [Range(0f, 1f)] public float healRatio = 0.3f;
-    [Tooltip("자동 보상: 레벨업마다 커지는 비율 (현재 크기에 곱함, 0.07 = 7%씩 곱해서 커짐)")] public float growPerLevel = 0.07f;
+    [Tooltip("자동 보상: 레벨업마다 커지는 비율 (현재 크기에 곱함, 0.07 = 7%씩 곱해서 커짐)")] public float growPerLevel = 0.05f;
     [Tooltip("몸 크기 최대 배율 (처음 크기 기준, 0 = 제한 없음)")] public float maxSizeMultiplier = 0f;
 
     // 거대화: 처음 크기 기준 배율. 고른 뒤 게임이 진행되면 부드럽게 커짐

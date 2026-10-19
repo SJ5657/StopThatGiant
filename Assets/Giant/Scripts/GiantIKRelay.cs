@@ -12,5 +12,6 @@ public class GiantIKRelay : MonoBehaviour
     void OnAnimatorIK(int layerIndex)
     {
         if (owner && anim) owner.OnIK(anim);
+        if (HostageEvent.Instance && anim) HostageEvent.Instance.OnIK(anim); // 인질 이벤트의 손 동작 (GiantEat 다음에 덮어씀)
     }
 }
