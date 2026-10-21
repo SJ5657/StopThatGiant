@@ -65,7 +65,7 @@ public class SkillCards : MonoBehaviour
     {
         if (!ctrl) ctrl = FindObjectOfType<GiantController>();
         if (!ctrl) return;
-        if (!sizeBaseSet) { baseModelScale = ctrl.ModelScale; sizeBaseSet = true; } // 성별 선택 후의 모델 크기 기준
+        if (!sizeBaseSet) { baseModelScale = GiantShrink.Active ? GiantShrink.SavedScale : ctrl.ModelScale; sizeBaseSet = true; } // 성별 선택 후의 모델 크기 기준
         sizeMult *= 1f + amount; // 곱하기 방식: 현재 크기의 amount만큼 더 커짐
         if (maxSizeMultiplier > 0f) sizeMult = Mathf.Min(sizeMult, maxSizeMultiplier);
     }
@@ -84,7 +84,7 @@ public class SkillCards : MonoBehaviour
 
     void Update()
     {
-        if (CardDraft.IsOpen || !ctrl || !sizeBaseSet || Mathf.Approximately(shownSizeMult, sizeMult)) return;
+        if (CardDraft.IsOpen || GiantShrink.Active || !ctrl || !sizeBaseSet || Mathf.Approximately(shownSizeMult, sizeMult)) return;
         float step = Mathf.Max(0.01f, sizeMult - 1f) / Mathf.Max(0.05f, growTime) * Time.deltaTime;
         shownSizeMult = Mathf.MoveTowards(shownSizeMult, sizeMult, Mathf.Max(step, 0.3f * Time.deltaTime));
         ctrl.SetModelScale(baseModelScale * shownSizeMult);

@@ -121,7 +121,7 @@ public class HeliAI : MonoBehaviour
             transform.rotation = Quaternion.Slerp(transform.rotation, yaw * Quaternion.Euler(pitch, 0, roll), dt * 3f);
         }
 
-        if (!g.IsDead && !GiantHome.GiantSafe && Time.time >= nextFire) Fire(g); // 거인의 집 안이면 공격 안 함
+        if (!g.IsDead && !GiantHome.GiantSafe && !HostageEvent.HoldingHuman && !GasCloud.GiantHidden && Time.time >= nextFire) Fire(g); // 거인의 집 안이거나 사람을 쥐고 있으면 공격 안 함
     }
 
     // ───────────── 비틀거림 ─────────────

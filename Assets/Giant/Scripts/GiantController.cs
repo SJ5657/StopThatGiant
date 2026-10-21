@@ -16,9 +16,16 @@ public class GiantController : MonoBehaviour
     [HideInInspector] public Vector2 externalInput;
     [HideInInspector] public bool externalRun;
     [HideInInspector] public bool inputLocked;
+    // 0보다 크면 크기와 상관없이 이 속도(m/s, 달리기 기준)로 이동 (UFO 축소빔으로 작아졌을 때)
+    [HideInInspector] public float speedOverride;
+    // 값이 있으면 입력을 무시하고 그 지점까지 스스로 달려감 (도착하면 null)
+    [HideInInspector] public Vector3? autoMoveTarget;
 
+    public static GiantController Instance { get; private set; }
     public bool IsRunning { get; private set; }
     public Vector3 Velocity { get; private set; }
+    // 이번 프레임 이동 전 위치 (빨리 달려도 지나간 길 위의 아이템을 놓치지 않게 ItemDrops.PathDistance에서 씀)
+    public Vector3 PrevPosition { get; private set; }
 
     CharacterController cc;
     Animator anim;
@@ -47,6 +54,8 @@ public class GiantController : MonoBehaviour
 
     void Awake()
     {
+        Instance = this;
+        PrevPosition = transform.position;
         FixFaceShadows();
         cc = GetComponent<CharacterController>();
         anim = GetComponentInChildren<Animator>();
@@ -85,6 +94,8 @@ public class GiantController : MonoBehaviour
         cc.radius = ccRadiusPer * gs;
         cc.center = new Vector3(cc.center.x, ccCenterYPer * gs, cc.center.z);
         cc.stepOffset = Mathf.Min(ccStepPer * gs, cc.height * 0.5f);
+        cc.skinWidth = Mathf.Clamp(cc.radius * 0.1f, 0.0005f, 0.08f); // 아주 작아졌을 때(축소빔) 캡슐보다 두꺼운 스킨 방지. 보통 크기에선 기본값 0.08 그대로
+        cc.minMoveDistance = Mathf.Min(0.001f, cc.radius * 0.01f);
     }
 
     // 모델이 바뀌면(성별 선택) 애니메이터 다시 찾고, 모델 키에 맞춰 충돌 캡슐 높이 조정
@@ -100,6 +111,7 @@ public class GiantController : MonoBehaviour
 
     void Update()
     {
+        PrevPosition = transform.position;
         float scale = GameScale;
         Vector2 input = new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical")) + externalInput;
         input = Vector2.ClampMagnitude(input, 1f);
@@ -112,10 +124,20 @@ public class GiantController : MonoBehaviour
         Vector3 fwd = Vector3.forward, right = Vector3.right;
         if (cameraTransform)
         {
-            fwd = Vector3.ProjectOnPlane(cameraTransform.forward, Vector3.up).normalized;
+            // 카메라가 거의 수직으로 내려다보면(탑뷰) forward가 바닥과 수직이라 앞뒤 방향이 사라짐 → 그땐 카메라 위쪽(up)을 앞으로 씀
+            Vector3 f = Vector3.ProjectOnPlane(cameraTransform.forward, Vector3.up);
+            if (f.sqrMagnitude < 0.04f) f = Vector3.ProjectOnPlane(cameraTransform.up, Vector3.up);
+            fwd = f.normalized;
             right = Vector3.ProjectOnPlane(cameraTransform.right, Vector3.up).normalized;
         }
         Vector3 moveDir = fwd * input.y + right * input.x;
+        // 자동 이동 (축소빔에 맞아 인도로 피할 때 등): 입력 대신 목표 지점으로 달려감
+        if (autoMoveTarget.HasValue)
+        {
+            Vector3 to = autoMoveTarget.Value - transform.position; to.y = 0f;
+            if (to.magnitude < Mathf.Max(0.05f, cc.radius)) autoMoveTarget = null;
+            else { moveDir = to.normalized; input = Vector2.up; wantRun = true; }
+        }
         bool moving = moveDir.sqrMagnitude > 0.001f;
         // 스테미나: 남아 있고 지치지 않았을 때만 달리기
         IsRunning = wantRun && moving && (stamina == null || stamina.CanRun);
@@ -129,7 +151,8 @@ public class GiantController : MonoBehaviour
         if (cc.isGrounded && verticalVel < 0) verticalVel = -1f * scale;
         verticalVel -= gravity * scale * Time.deltaTime;
 
-        Vector3 vel = (moving ? moveDir.normalized : Vector3.zero) * speed * scale;
+        float hSpeed = speedOverride > 0f ? (moving ? speedOverride * (IsRunning ? 1f : 0.5f) * input.magnitude : 0f) : speed * scale;
+        Vector3 vel = (moving ? moveDir.normalized : Vector3.zero) * hSpeed;
         vel.y = verticalVel;
         cc.Move(vel * Time.deltaTime);
         Velocity = new Vector3(vel.x, 0, vel.z);
@@ -151,7 +174,8 @@ public class GiantController : MonoBehaviour
         lastPos = transform.position; hasLastPos = true;
 
         float target = !moving ? 0f : (IsRunning ? 1f : 0.5f);
-        animSpeed = Mathf.MoveTowards(animSpeed, target, Time.deltaTime * 3f);
+        // 줍는 동작 중(입력 잠금)엔 바로 서 있는 자세로: 달리던 다리가 들린 채 굳어 팔처럼 보이지 않게
+        animSpeed = Mathf.MoveTowards(animSpeed, target, Time.deltaTime * (inputLocked ? 14f : 3f));
         if (anim)
         {
             anim.SetFloat(SpeedHash, animSpeed);

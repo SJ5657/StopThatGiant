@@ -13,7 +13,19 @@ public class GiantHealth : MonoBehaviour
     public float HP { get; private set; }
     // 무한모드(시작 화면 버튼) 또는 테스트 옵션이면 HP가 0이 되어도 죽지 않음
     bool NoDeath => testNoDeath || GameStartMenu.InfiniteMode;
-    public bool IsDead => HP <= 0f && !NoDeath;
+    public bool IsDead => forcedDead || (HP <= 0f && !NoDeath);
+    bool forcedDead;          // 즉사 (축소된 채 밟힘 등): 무한모드·테스트 옵션과 상관없이 게임 오버
+    public string DeathReason { get; private set; }
+
+    // 즉사시키고 게임 오버 (reason은 DEFEATED 아래에 표시)
+    public void Kill(string reason)
+    {
+        if (IsDead) return;
+        forcedDead = true; HP = 0f; DeathReason = reason;
+        hitFlash = 0.25f;
+        if (ctrl) ctrl.enabled = false;
+        if (anim) anim.SetFloat("Speed", 0f);
+    }
 
     CharacterController cc;
     Animator anim;
@@ -131,6 +143,7 @@ public class GiantHealth : MonoBehaviour
     {
         if (IsDead) return;
         if (GiantHome.GiantSafe) return; // 거인의 집 안에서는 날아오던 공격도 피해 없음
+        if (GiantShrink.Active) return;  // 축소빔으로 작아진 동안은 군대 공격을 받지 않음 (대신 사람·차에 밟히면 즉사)
         dmg *= damageTakenMultiplier;
         HP = Mathf.Max(0, HP - dmg);
         hitFlash = shake ? 0.25f : Mathf.Max(hitFlash, 0.08f);
@@ -156,16 +169,21 @@ public class GiantHealth : MonoBehaviour
     {
         var cam = Camera.main;
         if (!cam || !cc || IsDead) return;
-        Vector3 sp = cam.WorldToScreenPoint(transform.position + Vector3.up * (cc.height + 1f));
+        Vector3 sp = cam.WorldToScreenPoint(transform.position + Vector3.up * (cc.height * 1.08f));
         if (sp.z <= 0f) return;
         float w = 70, h = 8;
         float x = sp.x - w * 0.5f, y = Screen.height - sp.y - h - 4f;
         GUI.color = new Color(0, 0, 0, 0.6f);
         GUI.DrawTexture(new Rect(x - 1, y - 1, w + 2, h + 2), Texture2D.whiteTexture);
-        GUI.color = hitFlash > 0 ? new Color(1f, 0.9f, 0.9f) : new Color(0.9f, 0.2f, 0.25f);
-        GUI.DrawTexture(new Rect(x, y, w * Mathf.Clamp01(HP / maxHP), h), Texture2D.whiteTexture);
+        bool tiny = GiantShrink.Active;
+        GUI.color = (hitFlash > 0 || (tiny && GiantShrink.TinyHitFlash)) ? new Color(1f, 0.9f, 0.9f) : new Color(0.9f, 0.2f, 0.25f);
+        GUI.DrawTexture(new Rect(x, y, w * Mathf.Clamp01(ShownHP / ShownMaxHP), h), Texture2D.whiteTexture);
         GUI.color = Color.white;
     }
+
+    // 축소빔으로 작아진 동안은 소인 HP를 보여줌 (원래 HP는 그대로 보존)
+    float ShownHP => GiantShrink.Active ? GiantShrink.TinyHP : HP;
+    float ShownMaxHP => GiantShrink.Active ? Mathf.Max(1f, GiantShrink.TinyMaxHP) : maxHP;
 
     void OnGUI()
     {
@@ -175,15 +193,18 @@ public class GiantHealth : MonoBehaviour
         GUI.color = new Color(0, 0, 0, 0.6f);
         GUI.DrawTexture(new Rect(x - 3, y - 3, w + 6, h + 6), Texture2D.whiteTexture);
         GUI.color = hitFlash > 0 ? new Color(1f, 0.9f, 0.9f) : healGlow > 0 ? Color.Lerp(new Color(0.9f, 0.2f, 0.25f), new Color(0.3f, 1f, 0.45f), 0.5f + 0.5f * Mathf.Sin(Time.time * 10f)) : new Color(0.9f, 0.2f, 0.25f);
-        GUI.DrawTexture(new Rect(x, y, w * HP / maxHP, h), Texture2D.whiteTexture);
+        if (GiantShrink.Active && GiantShrink.TinyHitFlash) GUI.color = new Color(1f, 0.9f, 0.9f);
+        GUI.DrawTexture(new Rect(x, y, w * Mathf.Clamp01(ShownHP / ShownMaxHP), h), Texture2D.whiteTexture);
         GUI.color = Color.white;
         var style = new GUIStyle(GUI.skin.label) { fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
-        GUI.Label(new Rect(x, y, w, h), $"GIANT HP  {Mathf.CeilToInt(HP)} / {maxHP:0}" + (GameStartMenu.InfiniteMode ? "  (무한모드)" : testNoDeath ? "  (TEST)" : ""), style);
+        string label = GiantShrink.Active ? "소인 HP" : "GIANT HP";
+        GUI.Label(new Rect(x, y, w, h), $"{label}  {Mathf.CeilToInt(ShownHP)} / {ShownMaxHP:0}" + (GameStartMenu.InfiniteMode ? "  (무한모드)" : testNoDeath ? "  (TEST)" : ""), style);
         if (IsDead)
         {
             var big = new GUIStyle(GUI.skin.label) { fontSize = 42, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
             GUI.Label(new Rect(0, Screen.height * 0.4f, Screen.width, 60), "DEFEATED", big);
-            GUI.Label(new Rect(0, Screen.height * 0.4f + 60, Screen.width, 30), "Press R to restart", style);
+            if (!string.IsNullOrEmpty(DeathReason)) GUI.Label(new Rect(0, Screen.height * 0.4f + 50, Screen.width, 30), DeathReason, style);
+            GUI.Label(new Rect(0, Screen.height * 0.4f + 80, Screen.width, 30), "Press R to restart", style);
         }
     }
 }

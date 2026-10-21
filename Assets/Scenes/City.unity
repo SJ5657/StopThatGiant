@@ -753627,13 +753627,14 @@ MonoBehaviour:
   - {fileID: 100000, guid: 81c050d9e127fdd45af1f6b8da476b2b, type: 3}
   - {fileID: 100000, guid: 9500f0cdde0097a4aac35ced7c1935d7, type: 3}
   city: {fileID: 1316342897}
-  count: 160
+  count: 280
   carScale: 1.6
   speedRange: {x: 18, y: 30}
   spawnRadius: 1100
   respawnMinDistance: 350
   despawnDistance: 1500
-  respawnInterval: 0.15
+  spawnClearance: 25
+  respawnInterval: 0.08
 --- !u!1 &1316428467
 GameObject:
   m_ObjectHideFlags: 0
@@ -861778,6 +861779,7 @@ MonoBehaviour:
   externalInput: {x: 0, y: 0}
   externalRun: 0
   inputLocked: 0
+  speedOverride: 0
   scaleCompensation: 1
 --- !u!143 &1504496840
 CharacterController:
@@ -876085,6 +876087,102 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1527779772}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &1528383182
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1528383185}
+  - component: {fileID: 1528383184}
+  - component: {fileID: 1528383183}
+  m_Layer: 0
+  m_Name: UfoManager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 0
+--- !u!114 &1528383183
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1528383182}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7fd3cb6b04188b54bba9fef0a174ca8e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  duration: 10
+  tinyHeight: 0.35
+  transitionTime: 0.3
+  tinyRunSpeed: 3.6
+  tinyCameraDistance: 30
+  tinyCameraPitch: 70
+  tinyCameraFov: 6.8
+  walkerCount: 24
+  walkerSpawnDistance: {x: 8, y: 28}
+  walkerDespawnDistance: 40
+  walkerSpeed: {x: 2, y: 4.8}
+  walkerAimSpread: 6
+  extraCars: 0
+  extraCarDistance: {x: 40, y: 220}
+  graceTime: 1.5
+  sidewalkMoveTime: 1.2
+  maxStepUp: 0.6
+  wheelAxle: 0.33
+  wheelSide: 0.4
+  tireWidthRatio: 0.11
+  trackRange: 30
+  trackAhead: 20
+  maxTrackedCars: 12
+  trackColor: {r: 1, g: 0.15, b: 0.1, a: 0.55}
+  tinyMaxHP: 20
+  damagePerHit: 10
+  hitInvulnerable: 1
+--- !u!114 &1528383184
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1528383182}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a31e85ee1ed095f45a3a00272217d5ca, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  ufoPrefab: {fileID: 5903451119183343922, guid: cef6de11ad9c348f1902c4033bed1701, type: 3}
+  sizeRatio: 1.1
+  altitudeRatio: 1.4
+  orbitRadiusRatio: 2.2
+  orbitSpeed: 14
+  spinSpeed: 25
+  firstShotDelay: 0
+  fireInterval: 25
+  warnTime: 2
+  beamTime: 0.6
+  beamRadiusRatio: 0.35
+  beamColor: {r: 0.75, g: 0.35, b: 1, a: 1}
+--- !u!4 &1528383185
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1528383182}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1528580822
 GameObject:
   m_ObjectHideFlags: 0
@@ -931764,6 +931862,9 @@ GameObject:
   - component: {fileID: 1623737806}
   - component: {fileID: 1623737808}
   - component: {fileID: 1623737809}
+  - component: {fileID: 1623737810}
+  - component: {fileID: 1623737811}
+  - component: {fileID: 1623737812}
   m_Layer: 0
   m_Name: DestructionManager
   m_TagString: Untagged
@@ -931839,6 +931940,7 @@ MonoBehaviour:
   dropChance: 0
   sizeRatio: 0.15
   lifetime: 60
+  pickupDelay: 3
   crateColor: {r: 0.25, g: 0.9, b: 0.4, a: 1}
   healRatio: 1
   xpBoostSeconds: 60
@@ -931858,7 +931960,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 117cff0b53d32ef4f868ad9c3a7718df, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  eventChance: 0.05
+  eventChance: 0
   cooldown: 30
   hostagePrefab: {fileID: -1728013695380148634, guid: c4928ece714f93b4cbbed9ad8c797a35, type: 3}
   carScale: 2.2
@@ -931873,15 +931975,29 @@ MonoBehaviour:
   rescueScore: 500
   xpBoostSeconds: 30
   retreatSeconds: 20
-  settleTime: 0.35
-  reachTime: 0.5
-  liftTime: 0.6
+  settleTime: 0.15
+  reachTime: 0.3
+  liftTime: 0.35
   releaseTime: 0.6
-  crouchDepth: 0.12
+  crouchDepth: 0.2
+  hipLeanShare: 0.35
   leanAngle: 55
   helpText: Help Me!
   struggle: 1
-  pipSize: 240
+  pipSize: 110
+  heldPipSize: 170
+  victimHoldTime: {x: 9, y: 14}
+  escapeTime: 1.3
+  escapeText: "\uB194\uC918!"
+  hostageTitles:
+  - "VIP \uC778\uC9C8 \xB7 \uAD6D\uBC29\uBD80 \uC7A5\uAD00"
+  - "VIP \uC778\uC9C8 \xB7 \uB300\uD1B5\uB839 \uBE44\uC11C\uC2E4\uC7A5"
+  - "VIP \uC778\uC9C8 \xB7 \uC7AC\uBC8C \uADF8\uB8F9 \uD68C\uC7A5"
+  - "VIP \uC778\uC9C8 \xB7 \uC911\uC559\uC740\uD589 \uCD1D\uC7AC"
+  - "VIP \uC778\uC9C8 \xB7 UN \uD2B9\uC0AC"
+  - "VIP \uC778\uC9C8 \xB7 4\uC131 \uC7A5\uAD70"
+  - "VIP \uC778\uC9C8 \xB7 \uAD6D\uAC00\uC815\uBCF4\uC6D0\uC7A5"
+  - "VIP \uC778\uC9C8 \xB7 \uC678\uAD50\uBD80 \uC7A5\uAD00"
   ikRotOffsetEuler: {x: 0, y: 90, z: 0}
   curlSign: -1
   gripStrength: 1
@@ -931889,6 +932005,74 @@ MonoBehaviour:
   gripHeight: 0.55
   thumbOpposeDeg: 30
   thumbCurlDeg: -40
+--- !u!114 &1623737810
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1623737805}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 92c3b8779d64a0843bdbb8c09e3037b2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  chance: 0.28
+  maxAlive: 4
+  lifetime: 45
+  pickRangeRatio: 0.35
+  grabDelay: 3
+  rubbleColor: {r: 0.55, g: 0.53, b: 0.5, a: 1}
+  pipRange: 150
+  pipSize: 110
+--- !u!114 &1623737811
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1623737805}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dc200437d9db1104dae00aa497c918d6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  sackPrefab: {fileID: 35155290983009996, guid: 9292d5572f42ffc4d8d8212031d30220, type: 3}
+  chance: 0.13
+  maxPiles: 3
+  sackHeightRatio: 0.13
+  sacksPerPile: {x: 7, y: 11}
+  lifetime: 60
+  pickupDelay: 3
+  fartRadiusRatio: 3.2
+  gasDuration: 12
+  healRatio: 0.3
+  smokeColor: {r: 0.82, g: 0.82, b: 0.84, a: 0.6}
+  pipRange: 150
+  pipSize: 110
+--- !u!114 &1623737812
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1623737805}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 677070c628a9d3245bf80fdc896136ae, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  chance: 0.1
+  maxPuddles: 3
+  radiusRatio: 0.3
+  lifetime: 45
+  armDelay: 1
+  slipTime: 2.7
+  slipSpeed: 1.5
+  slideScale: 4.2
+  impactTime: 1
+  impactRadiusRatio: 1.2
+  waterColor: {r: 0.1, g: 0.3, b: 0.78, a: 0.82}
 --- !u!1 &1623920992
 GameObject:
   m_ObjectHideFlags: 0
@@ -1234182,3 +1234366,4 @@ SceneRoots:
   - {fileID: 1411558018}
   - {fileID: 1534904503}
   - {fileID: 475021570}
+  - {fileID: 1528383185}

@@ -32,14 +32,15 @@ public class HostageEvent : MonoBehaviour
     [Tooltip("보상 중 적 후퇴가 나왔을 때 지속 시간(초)")] public float retreatSeconds = 20f;
 
     [Header("동작 시간(초)")]
-    [Tooltip("차를 줍기 전, 달리기를 멈추고 자세가 정리될 때까지 기다리는 시간(초)")] public float settleTime = 0.35f;
-    public float reachTime = 0.5f;
-    public float liftTime = 0.6f;
+    [Tooltip("차를 줍기 전, 달리기를 멈추고 자세가 정리될 때까지 기다리는 시간(초)")] public float settleTime = 0.15f;
+    public float reachTime = 0.3f;
+    public float liftTime = 0.35f;
     public float releaseTime = 0.6f;
-    [Tooltip("엉덩이를 낮추는 정도 (모델 크기 비율)")] public float crouchDepth = 0.12f;
+    [Tooltip("엉덩이를 낮추는 정도 (모델 크기 비율, 무릎을 굽혀 쪼그림)")] public float crouchDepth = 0.2f;
+    [Tooltip("숙이는 각도 중 엉덩이로 기울이는 비율 (나머지는 허리·가슴을 굽힘)")] [Range(0f, 1f)] public float hipLeanShare = 0.35f;
     [Tooltip("상체를 앞으로 숙이는 각도")] public float leanAngle = 55f;
 
-    enum Phase { None, Chase, Reach, Lift, Carry, Release }
+    enum Phase { None, Chase, Reach, Lift, Carry, Release, Escape, Drop }
     Phase phase;
     float t, nextAt, chaseLeft;
 
@@ -56,16 +57,57 @@ public class HostageEvent : MonoBehaviour
     [Header("인질 연출")]
     [Tooltip("인질이 손에 잡혀 있는 동안 하는 말 (말풍선)")] public string helpText = "Help Me!";
     [Tooltip("발버둥 세기 (0 = 가만히)")] [Range(0f, 2f)] public float struggle = 1f;
-    [Tooltip("우측 상단 확대 화면 한 변 길이(px)")] public float pipSize = 240f;
+    [Tooltip("물체 위에 뜨는 확대 화면 한 변 길이(px)")] public float pipSize = 110f;
+    [Tooltip("손에 쥔 인질을 보여주는 우측 상단 확대 화면 한 변 길이(px)")] public float heldPipSize = 170f;
 
     // 인질 이벤트 중엔 손을 쓰는 다른 동작(시민 잡아먹기)을 막음
+    public bool Busy => phase != Phase.None; // 이벤트 진행 중 (UFO는 이때 빔을 쏘지 않음)
     public static bool HandBusy => Instance && Instance.phase != Phase.None && Instance.phase != Phase.Chase;
+    // 사람을 손에 쥐고 있는 동안 (적이 공격하지 않음)
+    public static bool HoldingHuman => Instance && (Instance.phase == Phase.Lift || Instance.phase == Phase.Carry || Instance.phase == Phase.Escape);
+
+    // ───── 잔해에 깔린 사람 구하기 (RubbleVictim) ─────
+    [Header("잔해에 깔린 사람")]
+    [Tooltip("쥐고 있다가 탈출을 시도하기까지 시간 범위(초)")] public Vector2 victimHoldTime = new Vector2(9f, 14f);
+    [Tooltip("탈출하려고 버둥거리는 시간(초) 뒤 손에서 떨어짐")] public float escapeTime = 1.3f;
+    public string escapeText = "놔줘!";
+    bool victimMode, escaping; RubbleVictim victim; float dropAt; Vector3 victimStart;
+
+    // 거인이 깔린 사람에게 다가가면 RubbleVictim이 호출. 손이 비어 있으면 집기 시작
+    public static bool TryGrabVictim(RubbleVictim v)
+    {
+        var e = Instance;
+        if (!e || !v || e.phase != Phase.None || GiantShrink.Active || WaterPuddles.Slipping) return false; // 넘어지는 중엔 못 집음
+        e.Find();
+        if (!e.hp || e.hp.IsDead) return false;
+        e.victimMode = true; e.victim = v; e.car = null;
+        e.LockInput(true);
+        e.Begin(Phase.Reach);
+        e.t = -e.settleTime / e.reachTime;
+        return true;
+    }
 
     const AvatarIKGoal Goal = AvatarIKGoal.RightHand;
     const AvatarIKHint Elbow = AvatarIKHint.RightElbow;
     const HumanBodyBones HandBone = HumanBodyBones.RightHand, GripBone = HumanBodyBones.RightMiddleProximal, UpperArm = HumanBodyBones.RightUpperArm;
 
     void Awake() { Instance = this; }
+
+    // ───── 인질 = 아이템 (습득 알림) ─────
+    [Tooltip("인질을 손에 넣을 때 알림에 뜨는 이름 (무작위)")]
+    public string[] hostageTitles = { "VIP 인질 · 국방부 장관", "VIP 인질 · 대통령 비서실장", "VIP 인질 · 재벌 그룹 회장", "VIP 인질 · 중앙은행 총재", "VIP 인질 · UN 특사", "VIP 인질 · 4성 장군", "VIP 인질 · 국가정보원장", "VIP 인질 · 외교부 장관" };
+    Texture2D hostageIcon;
+    void Start() { hostageIcon = ItemFeed.RenderIcon(hostagePrefab, 96, 160f); }
+
+    string currentTitle;
+    public string PickTitle() => hostageTitles != null && hostageTitles.Length > 0 ? hostageTitles[Random.Range(0, hostageTitles.Length)] : "VIP 인질";
+
+    void AnnounceHostage()
+    {
+        string title = victimMode && victim && !string.IsNullOrEmpty(victim.Title) ? victim.Title : PickTitle();
+        currentTitle = title;
+        ItemFeed.Show(title, hostageIcon, "확보! 쥐고 있으면 적이 공격 안 함", new Color(1f, 0.82f, 0.3f));
+    }
     void OnDestroy() { if (Instance == this) Instance = null; Cleanup(); }
 
     // 건물이 부서질 때 BuildingDestruction이 호출
@@ -90,7 +132,7 @@ public class HostageEvent : MonoBehaviour
     // ───────────── 시작: 검은 차량 ─────────────
     void TryStart(Vector3 pos)
     {
-        if (phase != Phase.None || Time.time < nextAt || Random.value >= eventChance || !hostagePrefab) return;
+        if (phase != Phase.None || Time.time < nextAt || ItemDrops.Skip(eventChance) || !hostagePrefab) return;
         Find();
         if (!hp || hp.IsDead) return;
         var traffic = FindObjectOfType<TrafficManager>();
@@ -120,7 +162,7 @@ public class HostageEvent : MonoBehaviour
         var glow = ThreatGlow.Add(car.transform, 18f, 0.03f, new Color(1f, 0.85f, 0.2f, 0.9f));
         if (glow) glow.transform.localPosition = Vector3.up * 1f;
         chaseLeft = chaseTime;
-        phase = Phase.Chase;
+        phase = Phase.Chase; ItemDrops.Spawned++;
     }
 
     float FleeSpeed() => ctrl ? Mathf.Max(12f, ctrl.runSpeed * ctrl.GameScale * carSpeedRatio) : 25f;
@@ -161,13 +203,15 @@ public class HostageEvent : MonoBehaviour
                 }
                 break;
             case Phase.Reach:
+                if (victimMode && !victim) { EndEvent(false); break; } // 집기 전에 사라짐
                 t += dt / reachTime;
                 if (t >= 1f)
                 {
                     liftStart = PalmWorld();
-                    if (car) { Vector3 toCar = car.transform.position - hp.transform.position; toCar.y = 0f; reachRot = HandRotation(toCar, Vector3.down); }
-                    SpawnHostage();
-                    SpawnDestination();
+                    Vector3 tp = ReachTargetPos(); Vector3 toT = tp - hp.transform.position; toT.y = 0f;
+                    reachRot = HandRotation(toT, Vector3.down);
+                    if (victimMode) TakeVictim();
+                    else { SpawnHostage(); SpawnDestination(); }
                     Begin(Phase.Lift);
                 }
                 break;
@@ -176,7 +220,16 @@ public class HostageEvent : MonoBehaviour
                 if (t >= 1f) { if (car) Destroy(car); Destroy(carBeacon); LockInput(false); Begin(Phase.Carry); }
                 break;
             case Phase.Carry:
-                if (Flat(hp.transform.position - dest).magnitude < GiantHeight * arriveRatio) Begin(Phase.Release);
+                if (victimMode) { if (Time.time >= dropAt) Begin(Phase.Escape); }
+                else if (Flat(hp.transform.position - dest).magnitude < GiantHeight * arriveRatio) Begin(Phase.Release);
+                break;
+            case Phase.Escape: // 소인이 손에서 빠져나가려고 크게 버둥거림 → 떨어짐
+                t += dt / Mathf.Max(0.1f, escapeTime);
+                if (t >= 1f) DropVictim();
+                break;
+            case Phase.Drop: // 손을 펴며 원래 자세로
+                t += dt / 0.4f;
+                if (t >= 1f) EndEvent(false);
                 break;
             case Phase.Release:
                 t += dt / releaseTime;
@@ -215,9 +268,47 @@ public class HostageEvent : MonoBehaviour
 
     void EndEvent(bool success)
     {
+        bool wasVictim = victimMode;
         Cleanup();
         phase = Phase.None;
-        nextAt = Time.time + cooldown;
+        nextAt = Time.time + (wasVictim ? 1.5f : cooldown); // 깔린 사람 구하기는 인질 이벤트 쿨다운을 쓰지 않음
+    }
+
+    // 집으러 손을 뻗는 목표 지점 (차 지붕 / 깔린 사람 등)
+    Vector3 ReachTargetPos()
+    {
+        if (victimMode && victim) return victim.transform.position + Vector3.up * victim.Height * 0.25f;
+        return car ? car.transform.position + Vector3.up * 1.8f * carScale : hp.transform.position;
+    }
+
+    // 깔린 사람을 손에 쥠: 그 사람이 그대로 인질 역할 (크기 유지)
+    void TakeVictim()
+    {
+        hostage = victim.gameObject;
+        hostageAnim = victim.Anim;
+        hostageWorldHeight = victim.Height;
+        hostageScale = victim.transform.localScale.y;
+        victimStart = victim.transform.position;
+        victim.OnGrabbed();
+        AnnounceHostage();
+        dropAt = Time.time + liftTime + Random.Range(victimHoldTime.x, victimHoldTime.y);
+        MakePip();
+    }
+
+    // 버둥거리다 손에서 떨어짐: 사람은 FallingVictim이 떨어뜨리고, 손은 천천히 폄
+    void DropVictim()
+    {
+        if (hostage)
+        {
+            var fv = hostage.AddComponent<FallingVictim>();
+            Vector3 push = hp.transform.forward * 2f + hp.transform.right * Random.Range(-1.5f, 1.5f);
+            fv.Init(hostageAnim, victim ? victim.Height : hostageWorldHeight, push, hp.transform.position);
+        }
+        hostage = null; victim = null; // Cleanup에서 지우지 않게
+        if (pipCam) Destroy(pipCam.gameObject);
+        if (pipRT) { pipRT.Release(); Destroy(pipRT); }
+        pipCam = null; pipRT = null; hostageAnim = null;
+        Begin(Phase.Drop);
     }
 
     void Cleanup()
@@ -231,7 +322,8 @@ public class HostageEvent : MonoBehaviour
         if (pipRT) { pipRT.Release(); Destroy(pipRT); }
         pipCam = null; pipRT = null; hostageAnim = null;
         car = null; hostage = null; carBeacon = null; destBeacon = null;
-        if (phase != Phase.None) { phase = Phase.None; nextAt = Time.time + cooldown; }
+        if (phase != Phase.None) { phase = Phase.None; nextAt = Time.time + (victimMode ? 1.5f : cooldown); }
+        victimMode = false; victim = null;
     }
 
     // ───────────── 인질 · 목적지 ─────────────
@@ -250,8 +342,13 @@ public class HostageEvent : MonoBehaviour
         hostage.transform.localScale = Vector3.one * 0.01f;
         hostageAnim = a;
         hostageWorldHeight = GiantHeight * hostageHeightRatio;
+        MakePip();
+        AnnounceHostage();
+    }
 
-        // 우측 상단 확대 화면용 카메라 (인질을 앞에서 비춤)
+    // 우측 상단 확대 화면용 카메라 (인질을 앞에서 비춤)
+    void MakePip()
+    {
         var cg = new GameObject("HostageCam");
         cg.transform.SetParent(transform, false);
         pipCam = cg.AddComponent<Camera>();
@@ -275,7 +372,7 @@ public class HostageEvent : MonoBehaviour
     void Struggle()
     {
         if (!hostage || !hostageAnim || struggle <= 0f) return;
-        float tt = Time.time, k = struggle;
+        float tt = Time.time, k = struggle * (escaping ? 2.5f : 1f); // 탈출 시도 중엔 크게 버둥거림
         Transform root = hostage.transform;
         Vector3 fwd = root.forward, right = root.right;
         // 몸통: 좌우 흔들림은 거의 없고 위아래로 살짝 들썩임
@@ -393,13 +490,15 @@ public class HostageEvent : MonoBehaviour
         {
             case Phase.Reach:
                 w = Smooth(t); crouch = Smooth(t);
-                if (car)
+                if (car || (victimMode && victim))
                 {
-                    palm = car.transform.position + Vector3.up * 1.8f * carScale;
-                    Vector3 to = car.transform.position - hp.transform.position; to.y = 0f;
+                    palm = ReachTargetPos();
+                    Vector3 to = palm - hp.transform.position; to.y = 0f;
                     rot = HandRotation(to, Vector3.down); // 위에서 덮듯이 손바닥을 아래로
                 }
                 break;
+            case Phase.Escape: w = 1f; break;
+            case Phase.Drop: w = 1f - Smooth(t); break;
             case Phase.Lift:
                 w = 1f; crouch = 1f - Smooth(t / 0.7f);
                 palm = Vector3.Lerp(liftStart, CarryPoint(), Smooth(t));
@@ -413,13 +512,18 @@ public class HostageEvent : MonoBehaviour
         if (crouch > 0.001f)
         {
             PinFoot(a, AvatarIKGoal.LeftFoot); PinFoot(a, AvatarIKGoal.RightFoot);
+            KneeForward(a, AvatarIKHint.LeftKnee, HumanBodyBones.LeftLowerLeg, crouch); KneeForward(a, AvatarIKHint.RightKnee, HumanBodyBones.RightLowerLeg, crouch);
             a.bodyPosition = a.bodyPosition - Vector3.up * crouchDepth * s * crouch;
-            a.bodyRotation = Quaternion.AngleAxis(leanAngle * crouch, hp.transform.right) * a.bodyRotation;
+            // 엉덩이(몸 전체)는 조금만 기울이고 나머지는 허리·가슴을 굽혀 숙임: 엉덩이를 크게 돌리면 다리가 뒤로 꺾여 팔처럼 보였음
+            a.bodyRotation = Quaternion.AngleAxis(leanAngle * hipLeanShare * crouch, hp.transform.right) * a.bodyRotation;
+            float spineLean = leanAngle * (1f - hipLeanShare) * crouch / 3f;
+            BendBone(a, HumanBodyBones.Spine, spineLean); BendBone(a, HumanBodyBones.Chest, spineLean); BendBone(a, HumanBodyBones.UpperChest, spineLean);
         }
         else
         {
             a.SetIKPositionWeight(AvatarIKGoal.LeftFoot, 0f); a.SetIKRotationWeight(AvatarIKGoal.LeftFoot, 0f);
             a.SetIKPositionWeight(AvatarIKGoal.RightFoot, 0f); a.SetIKRotationWeight(AvatarIKGoal.RightFoot, 0f);
+            a.SetIKHintPositionWeight(AvatarIKHint.LeftKnee, 0f); a.SetIKHintPositionWeight(AvatarIKHint.RightKnee, 0f);
         }
 
         // 손목 목표 = 손바닥 목표 − (목표 회전에서의 손목→손바닥 벡터)
@@ -432,16 +536,36 @@ public class HostageEvent : MonoBehaviour
         Vector3 shoulder = Bone(UpperArm, hp.transform.position + Vector3.up * s);
         a.SetIKHintPositionWeight(Elbow, w * 0.8f);
         a.SetIKHintPosition(Elbow, shoulder + hp.transform.right * 0.25f * s - Vector3.up * 0.3f * s - hp.transform.forward * 0.05f * s);
-        if (phase == Phase.Reach && car)
+        if (phase == Phase.Reach && (car || (victimMode && victim)))
         {
             a.SetLookAtWeight(Smooth(t) * 0.9f, 0.3f, 1f);
-            a.SetLookAtPosition(car.transform.position);
+            a.SetLookAtPosition(ReachTargetPos());
         }
+    }
+
+    // 뼈 하나를 거인 오른쪽 축으로 앞으로 굽힘 (OnAnimatorIK 안에서 SetBoneLocalRotation으로)
+    void BendBone(Animator a, HumanBodyBones bone, float deg)
+    {
+        var b = a.GetBoneTransform(bone);
+        if (!b || !b.parent || Mathf.Abs(deg) < 0.01f) return;
+        Quaternion world = Quaternion.AngleAxis(deg, hp.transform.right) * b.rotation;
+        a.SetBoneLocalRotation(bone, Quaternion.Inverse(b.parent.rotation) * world);
+    }
+
+    // 쪼그릴 때 무릎이 앞으로 굽게 힌트를 줌 (힌트가 없으면 다리가 뒤로 꺾여 들려서 팔처럼 보였음)
+    void KneeForward(Animator a, AvatarIKHint hint, HumanBodyBones knee, float w)
+    {
+        var k = a.GetBoneTransform(knee);
+        if (!k) return;
+        a.SetIKHintPositionWeight(hint, w);
+        a.SetIKHintPosition(hint, k.position + hp.transform.forward * ModelScale * 0.4f);
     }
 
     static void PinFoot(Animator a, AvatarIKGoal foot)
     {
-        Vector3 p = a.GetIKPosition(foot); Quaternion r = a.GetIKRotation(foot);
+        Vector3 p = a.GetIKPosition(foot);
+        // 발은 땅에: 달리던 자세의 들린 발 높이가 아니라 바닥 높이로 고정
+        p.y = Mathf.Min(p.y, a.transform.position.y + a.transform.lossyScale.y * 0.1f); Quaternion r = a.GetIKRotation(foot);
         a.SetIKPositionWeight(foot, 1f); a.SetIKRotationWeight(foot, 1f);
         a.SetIKPosition(foot, p); a.SetIKRotation(foot, r);
     }
@@ -488,7 +612,8 @@ public class HostageEvent : MonoBehaviour
         if (phase == Phase.None || phase == Phase.Chase || !anim) return;
         var hand = HandT;
         if (!hand) return;
-        float curl = phase == Phase.Lift ? Smooth(t) : phase == Phase.Carry ? 1f : phase == Phase.Release ? 1f - Smooth(t) : 0f;
+        float curl = phase == Phase.Lift ? Smooth(t) : (phase == Phase.Carry || phase == Phase.Escape) ? 1f
+                   : (phase == Phase.Release || phase == Phase.Drop) ? 1f - Smooth(t) : 0f;
         CurlFingers(curl * gripStrength);
         Vector3 palmW = PalmWorld();
         float handLen = (Bone(GripBone, hand.position) - hand.position).magnitude;
@@ -497,9 +622,16 @@ public class HostageEvent : MonoBehaviour
         {
             float k = Smooth(t);
             if (car) { car.transform.position = Vector3.Lerp(car.transform.position, grip, k); car.transform.localScale = carStartScale * (1f - k); }
-            SetHostage(grip, k);
+            if (victimMode)
+            {
+                // 깔린 사람: 크기는 그대로, 땅에서 손으로 들어 올림
+                SetHostage(grip, 1f);
+                if (hostage) hostage.transform.position = Vector3.Lerp(victimStart, hostage.transform.position, k);
+            }
+            else SetHostage(grip, k);
         }
         else if (phase == Phase.Carry) SetHostage(grip, 1f);
+        else if (phase == Phase.Escape) { escaping = true; SetHostage(grip, 1f); escaping = false; }
         else if (phase == Phase.Release) SetHostage(grip, 1f - Smooth(t));
     }
 
@@ -542,10 +674,23 @@ public class HostageEvent : MonoBehaviour
         return arrowTex;
     }
 
-    bool HostageHeld => hostage && ((phase == Phase.Lift && t > 0.5f) || phase == Phase.Carry || (phase == Phase.Release && t < 0.5f));
+    // 확대 화면 상자 위치: 세계 좌표 world가 화면에 보이는 자리 바로 위 (화면 밖으로 나가지 않게)
+    public static Rect PipRectAbove(Vector3 world, float size)
+    {
+        var cam = Camera.main;
+        Vector3 sp = cam ? cam.WorldToScreenPoint(world) : new Vector3(Screen.width * 0.5f, Screen.height * 0.5f, 1f);
+        if (sp.z < 0f) { sp.x = Screen.width - sp.x; sp.y = 0f; }
+        float x = sp.x - size * 0.5f, y = (Screen.height - sp.y) - size - 34f; // 아래에 이름 띠가 들어갈 자리를 남김
+        x = Mathf.Clamp(x, 10f, Screen.width - size - 10f);
+        y = Mathf.Clamp(y, 10f, Screen.height - size - 30f);
+        return new Rect(x, y, size, size);
+    }
+
+    public static bool ShowingPip => Instance && Instance.HostageHeld; // 손에 쥔 인질 확대 화면이 떠 있는지
+    bool HostageHeld => hostage && ((phase == Phase.Lift && t > 0.5f) || phase == Phase.Carry || phase == Phase.Escape || (phase == Phase.Release && t < 0.5f));
 
     // 말풍선: center(GUI 좌표)를 가운데로 한 흰 상자 + 아래쪽 꼬리. bounds를 주면 그 영역 안으로 밀어 넣음
-    static void DrawBubble(Vector2 c, string text, int fontSize, Rect? bounds = null)
+    public static void DrawBubble(Vector2 c, string text, int fontSize, Rect? bounds = null)
     {
         if (string.IsNullOrEmpty(text)) return;
         var style = new GUIStyle(GUI.skin.label) { fontSize = fontSize, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, wordWrap = false };
@@ -573,18 +718,25 @@ public class HostageEvent : MonoBehaviour
     void DrawHostageView()
     {
         if (!HostageHeld || !pipRT || !pipCam) return;
-        float s = pipSize, x = Screen.width - s - 20f, y = 20f;
-        GUI.color = new Color(1f, 0.85f, 0.2f, 1f);
-        GUI.DrawTexture(new Rect(x - 4, y - 4, s + 8, s + 8), Texture2D.whiteTexture);
+        // 손에 쥔 인질은 우측 상단 모서리에 (깔린 사람·감자가방은 그 물체 바로 위에 뜸)
+        Rect box = new Rect(Screen.width - heldPipSize - 20f, 20f, heldPipSize, heldPipSize);
+        DrawPip(box, pipRT, new Color(1f, 0.85f, 0.2f), string.IsNullOrEmpty(currentTitle) ? "VIP 인질" : currentTitle);
+    }
+
+    // 확대 화면 상자 + 아래에 아이템 이름 (인질·깔린 사람·감자가방 공용)
+    public static void DrawPip(Rect box, Texture tex, Color frame, string name)
+    {
+        GUI.color = frame;
+        GUI.DrawTexture(new Rect(box.x - 3, box.y - 3, box.width + 6, box.height + 6), Texture2D.whiteTexture);
         GUI.color = Color.white;
-        var rect = new Rect(x, y, s, s);
-        GUI.DrawTexture(rect, pipRT, ScaleMode.StretchToFill, false);
-        if (string.IsNullOrEmpty(helpText)) return;
-        Vector3 head = hostage.transform.position + Vector3.up * hostageWorldHeight * 1.05f;
-        Vector3 sp = pipCam.WorldToScreenPoint(head);
-        if (sp.z <= 0f) return;
-        Vector2 c = new Vector2(x + sp.x / pipRT.width * s, y + (1f - sp.y / pipRT.height) * s - 30f + Mathf.Sin(Time.time * 8f) * 3f);
-        DrawBubble(c, helpText, 20, rect);
+        GUI.DrawTexture(box, tex, ScaleMode.StretchToFill, false);
+        if (string.IsNullOrEmpty(name)) return;
+        var st = new GUIStyle(GUI.skin.label) { fontSize = 12, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, wordWrap = false };
+        float w = Mathf.Max(box.width + 6f, st.CalcSize(new GUIContent(name)).x + 12f);
+        var lr = new Rect(box.center.x - w * 0.5f, box.yMax + 3f, w, 18f);
+        GUI.color = new Color(0f, 0f, 0f, 0.65f); GUI.DrawTexture(lr, Texture2D.whiteTexture);
+        GUI.color = frame; GUI.Label(lr, name, st);
+        GUI.color = Color.white;
     }
 
     // 도망치는 검은 차 말풍선: 상황(처음 · 거리 · 잡힘)에 맞는 짧은 대사

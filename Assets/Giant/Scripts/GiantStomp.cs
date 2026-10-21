@@ -43,7 +43,7 @@ public class GiantStomp : MonoBehaviour
 
     void LateUpdate() // 애니메이션 적용 후 뼈 위치 기준
     {
-        if (GameStartMenu.InMenu || !anim) return;
+        if (GameStartMenu.InMenu || !anim || GiantShrink.Active) return; // 축소빔으로 작아진 동안은 아무것도 부수거나 밟지 못함
         if (!gc) gc = GetComponent<GiantController>();
         float s = gc ? gc.GameScale : anim.transform.lossyScale.y;
         Vector3 push = controller ? controller.Velocity : transform.forward;

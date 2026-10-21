@@ -29,6 +29,27 @@ public class TallBuildings : MonoBehaviour
     readonly List<Transform> solid = new List<Transform>(); // 지금 부술 수 없는 빌딩
     float nextCheckAt, lastThreshold;
 
+    public static TallBuildings Instance { get; private set; }
+    void Awake() { Instance = this; }
+    void OnDestroy() { if (Instance == this) Instance = null; }
+
+    // 콜라이더가 지금 부술 수 없는 빌딩(또는 그 날개)에 속하면 빌딩 본체를 돌려줌
+    public Transform SolidRoot(Collider c)
+    {
+        for (Transform t = c ? c.transform : null; t; t = t.parent)
+            if (solid.Contains(t)) return t;
+        return null;
+    }
+
+    // 넘어지며 미끄러지는 거인에 부딪힌 경우: 단단한 빌딩이라도 목록에서 빼고 부숨
+    public void ForceBreak(Transform b, Vector3 hitPoint, Vector3 push)
+    {
+        if (!b) return;
+        solid.Remove(b);
+        SetLayer(b, buildingLayer);
+        BuildingDestruction.Break(b.gameObject, hitPoint, push);
+    }
+
     void Start()
     {
         buildingLayer = LayerMask.NameToLayer("Building");

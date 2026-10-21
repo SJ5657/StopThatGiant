@@ -136,6 +136,16 @@ public class Civilian : MonoBehaviour
     // 거인에게 잡힘: 스스로 움직이지 않음
     public void Grab() { state = State.Grabbed; }
 
+    // 방귀 가스에 쓰러져 죽음: 그 자리에 엎어져 움직이지 않다가 사라짐
+    public void Collapse()
+    {
+        if (state == State.Squashed || state == State.Grabbed) return;
+        state = State.Squashed; squashedAt = Time.time;
+        if (anim) anim.enabled = false;
+        transform.rotation = Quaternion.Euler(0f, transform.eulerAngles.y, 0f) * Quaternion.Euler(90f, 0f, 0f);
+        transform.position += Vector3.up * 0.3f * mgr.scale;
+    }
+
     void StartIdle()
     {
         state = State.Idle;

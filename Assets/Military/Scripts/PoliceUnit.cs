@@ -286,7 +286,7 @@ public class PoliceUnit : MonoBehaviour
 
     void Shoot(Officer o, GiantHealth g)
     {
-        if (GiantHome.GiantSafe) { o.nextShot = Time.time + 0.5f; return; } // 거인의 집 안이면 쏘지 않음
+        if (GiantHome.GiantSafe || HostageEvent.HoldingHuman || GasCloud.GiantHidden) { o.nextShot = Time.time + 0.5f; return; } // 거인의 집 안이거나 사람을 쥐고 있으면 쏘지 않음
         o.nextShot = Time.time + fireInterval * Random.Range(0.8f, 1.25f);
         Vector3 origin = o.t.position + Vector3.up * 2.6f * officerScale + o.t.forward * 1f;
         Vector3 aim = g.GetAimPoint();

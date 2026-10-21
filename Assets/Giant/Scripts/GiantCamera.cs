@@ -17,7 +17,7 @@ public class GiantCamera : MonoBehaviour
     public float minHeightAboveGround = 3f;
 
     public static GiantCamera Instance { get; private set; }
-    float shake;
+    float shake, normalFov = -1f;
 
     void Awake() { Instance = this; }
     void Start() { Lock(true); }
@@ -42,10 +42,19 @@ public class GiantCamera : MonoBehaviour
         if (!gc) gc = target.GetComponentInParent<GiantController>();
         float s = gc ? gc.GameScale : target.lossyScale.y; // 성별 무관 동일한 카메라 거리
         // 회전은 마우스로만 바뀌고, 위치는 거인을 따라감 (거인이 돌아도 화면은 돌지 않음)
-        Quaternion rot = Quaternion.Euler(pitch, yaw, 0);
+        // UFO 축소빔으로 작아지면: 사람 머리 위 높이에서 더 수직으로 내려다보며 시야각을 좁혀(망원) 작은 거인을 크게 보여줌
+        bool tiny = GiantShrink.Active;
+        float blend = tiny ? GiantShrink.CameraBlend : 0f;
+        var cam = GetComponent<Camera>();
+        if (cam)
+        {
+            if (normalFov < 0f) normalFov = cam.fieldOfView;
+            cam.fieldOfView = Mathf.Lerp(normalFov, GiantShrink.TinyCameraFov, blend);
+        }
+        Quaternion rot = Quaternion.Euler(Mathf.Lerp(pitch, GiantShrink.TinyCameraPitch, blend), yaw, 0);
         Vector3 pivot = (gc ? gc.transform.position : target.position) + Vector3.up * lookHeight * s;
-        Vector3 desired = pivot - rot * Vector3.forward * distance * s;
-        desired.y = Mathf.Max(desired.y, minHeightAboveGround);
+        Vector3 desired = pivot - rot * Vector3.forward * Mathf.Lerp(distance * s, GiantShrink.TinyCameraDistance, blend);
+        desired.y = Mathf.Max(desired.y, tiny ? 0.05f : minHeightAboveGround);
         float k = 1f - Mathf.Exp(-smooth * Time.deltaTime);
         transform.position = Vector3.Lerp(transform.position, desired, k);
         transform.rotation = Quaternion.Slerp(transform.rotation, rot, k);

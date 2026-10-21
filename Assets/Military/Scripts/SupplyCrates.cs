@@ -12,6 +12,7 @@ public class SupplyCrates : MonoBehaviour
     [Tooltip("건물을 하나 부술 때 상자가 나올 확률 (0.01 = 1%)")] [Range(0f, 1f)] public float dropChance = 0.01f;
     [Tooltip("상자 한 변 = 거인 키 × 이 비율")] public float sizeRatio = 0.15f;
     [Tooltip("먹지 않고 이 시간(초)이 지나면 사라짐")] public float lifetime = 60f;
+    [Tooltip("나온 뒤 이 시간(초)이 지나야 먹을 수 있음")] public float pickupDelay = 3f;
     public Color crateColor = new Color(0.25f, 0.9f, 0.4f);
 
     [Header("효과")]
@@ -70,7 +71,7 @@ public class SupplyCrates : MonoBehaviour
 
     void TryDrop(Vector3 pos)
     {
-        if (Random.value >= dropChance) return;
+        if (ItemDrops.Skip(dropChance)) return;
         var g = GiantHealth.Instance;
         float size = Mathf.Max(1f, (g ? g.Height : 28f) * sizeRatio);
 
@@ -85,6 +86,7 @@ public class SupplyCrates : MonoBehaviour
         mr.sharedMaterial = crateMaterial;
         mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         ThreatGlow.Add(go.transform, size * 2.4f, 0.02f, new Color(crateColor.r, crateColor.g, crateColor.b, 0.9f)); // 멀리서도 찾을 수 있게 초록 테두리
+        ItemDrops.Spawned++;
         crates.Add(new Crate { t = go.transform, born = Time.time, baseY = go.transform.position.y, size = size });
     }
 
@@ -99,7 +101,7 @@ public class SupplyCrates : MonoBehaviour
             // 천천히 돌며 위아래로 둥둥
             c.t.Rotate(0f, 60f * Time.deltaTime, 0f, Space.World);
             var p = c.t.position; p.y = c.baseY + Mathf.Sin((Time.time + c.born) * 2.5f) * c.size * 0.12f; c.t.position = p;
-            if (g && !g.IsDead && g.IsTouching(c.t.position, c.size * 0.6f))
+            if (g && !g.IsDead && Time.time - c.born >= pickupDelay && g.IsTouching(c.t.position, c.size * 0.6f)) // 나온 직후엔 바로 먹지 못함
             {
                 Collect(g, c.t.position);
                 Destroy(c.t.gameObject); crates.RemoveAt(i);
@@ -116,19 +118,19 @@ public class SupplyCrates : MonoBehaviour
         {
             case 3:
                 StartRunBoost();
-                Show($"보급상자: 달리기 속도 {runBoostMultiplier:0.#}배 ({runBoostSeconds:0}초)");
+                ShowItem($"보급상자: 달리기 속도 {runBoostMultiplier:0.#}배 ({runBoostSeconds:0}초)");
                 break;
             case 0:
                 g.Heal(g.maxHP * healRatio);
-                Show("보급상자: HP 회복!");
+                ShowItem("보급상자: HP 회복!");
                 break;
             case 1:
                 StartXpBoost();
-                Show($"보급상자: 경험치 {xpBoostMultiplier:0.#}배 ({xpBoostSeconds:0}초)");
+                ShowItem($"보급상자: 경험치 {xpBoostMultiplier:0.#}배 ({xpBoostSeconds:0}초)");
                 break;
             default:
                 EnemyFreeze.Freeze(freezeSeconds);
-                Show($"보급상자: 적 정지 ({freezeSeconds:0}초)");
+                ShowItem($"보급상자: 적 정지 ({freezeSeconds:0}초)");
                 break;
         }
     }
@@ -169,6 +171,13 @@ public class SupplyCrates : MonoBehaviour
     }
 
     void Show(string text) { toast = text; toastUntil = Time.time + 3f; }
+
+    // 상자를 먹었을 때: 가운데 알림 + 왼쪽 습득 알림(상자 아이콘)
+    void ShowItem(string text)
+    {
+        Show(text);
+        ItemFeed.Show("보급상자", crateMaterial ? crateMaterial.mainTexture : null, text.Replace("보급상자: ", ""), crateColor);
+    }
 
     // 먹은 효과 알림 + 남은 시간 표시 (다른 HUD가 숨겨져 있어도 보이게)
     void OnGUI()

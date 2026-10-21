@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-// 거인 방귀 가스(DigestGauge가 생성): 녹색 연기가 반경 안에 퍼졌다가 시간이 지나면 흩어짐.
+// 거인 방귀 가스(DigestGauge·PotatoSacks가 생성): 반투명 살색 연기가 반경 안에 퍼졌다가 시간이 지나면 흩어짐.
 // 가스 안의 적(탱크·헬기)은 지속 피해를 입고, 연막 때문에 명중률이 크게 떨어짐(GasCloud.InSmoke로 확인).
 public class GasCloud : MonoBehaviour
 {
@@ -13,14 +13,28 @@ public class GasCloud : MonoBehaviour
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     static void ResetStatics() { active.Clear(); }
 
+    // 거인이 연막(가스) 안에 숨어 있는지: 이때 적은 공격하지 못함
+    public static bool GiantHidden
+    {
+        get
+        {
+            var hp = GiantHealth.Instance;
+            return hp && InSmoke(hp.transform.position + Vector3.up * 0.5f);
+        }
+    }
+
     public static GasCloud Create(Vector3 center, float radius, float duration, float damagePerSecond, Material material)
+        => Create(center, radius, duration, damagePerSecond, material, null);
+
+    // color: 연기 색 (null이면 기본 반투명 살색)
+    public static GasCloud Create(Vector3 center, float radius, float duration, float damagePerSecond, Material material, Color? color)
     {
         var go = new GameObject("FartGas");
         go.transform.position = new Vector3(center.x, 0.5f, center.z);
         var g = go.AddComponent<GasCloud>();
         g.radius = radius; g.height = radius * 1.2f; g.duration = duration; g.dps = damagePerSecond;
         g.born = Time.time; g.nextTick = Time.time + 0.5f;
-        g.ps = g.CreateParticles(material);
+        g.ps = g.CreateParticles(material, color);
         active.Add(g);
         return g;
     }
@@ -63,7 +77,7 @@ public class GasCloud : MonoBehaviour
         }
     }
 
-    ParticleSystem CreateParticles(Material material)
+    ParticleSystem CreateParticles(Material material, Color? color)
     {
         var go = new GameObject("Gas");
         go.transform.SetParent(transform, false);
@@ -78,7 +92,9 @@ public class GasCloud : MonoBehaviour
         main.startSpeed = new ParticleSystem.MinMaxCurve(radius * 0.05f, radius * 0.15f);
         main.startSize = new ParticleSystem.MinMaxCurve(radius * 0.45f, radius * 0.8f);
         main.startRotation = new ParticleSystem.MinMaxCurve(0f, Mathf.PI * 2f);
-        main.startColor = new ParticleSystem.MinMaxGradient(new Color(0.5f, 0.72f, 0.2f, 0.85f), new Color(0.65f, 0.8f, 0.3f, 1f));
+        main.startColor = color.HasValue
+            ? new ParticleSystem.MinMaxGradient(color.Value * new Color(0.95f, 0.95f, 0.95f, 0.85f), color.Value)
+            : new ParticleSystem.MinMaxGradient(new Color(0.98f, 0.78f, 0.66f, 0.38f), new Color(1f, 0.86f, 0.76f, 0.55f)); // 기본: 반투명 살색 가스
         main.gravityModifier = -0.01f;
         main.maxParticles = 300;
         var emission = p.emission; emission.rateOverTime = 40f;

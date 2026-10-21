@@ -17,6 +17,42 @@ public class TrafficCar : MonoBehaviour
 
     public bool IsDead { get; private set; }
 
+    // ───── 서로 겹치지 않기 ─────
+    public static readonly System.Collections.Generic.List<TrafficCar> All = new System.Collections.Generic.List<TrafficCar>();
+    [Tooltip("차 길이(m). 생성 때 모델 크기로 채워짐")] public float length = 10f;
+    [Tooltip("앞차를 살피는 거리(m)")] public float lookAhead = 45f;
+    [Tooltip("앞차와 이 거리(m, 차체 사이) 이내면 완전히 멈춤")] public float stopGap = 3f;
+    [Tooltip("앞차와 이 거리(m) 이내면 점점 감속")] public float followGap = 22f;
+    [Tooltip("옆으로 이 거리(m) 이내에 있으면 같은 길을 가는 것으로 봄")] public float laneWidth = 6f;
+    float curSpeed, limit = 1f, nextCheck;
+
+    void OnEnable() { if (!All.Contains(this)) All.Add(this); }
+    void OnDisable() { All.Remove(this); }
+
+    // 앞에 있는 차에 맞춰 속도 배율(0~1)을 정함. 같은 방향 앞차는 항상 피하고,
+    // 교차로에서 엇갈리는 차는 인스턴스 ID가 작은 쪽이 먼저 지나감 (서로 양보하다 멈추는 교착 방지)
+    float CheckAhead()
+    {
+        Vector3 fwd = transform.forward; fwd.y = 0f; fwd.Normalize();
+        Vector3 right = Right(fwd), pos = transform.position;
+        int myId = GetInstanceID();
+        float best = 1f;
+        foreach (var o in All)
+        {
+            if (!o || o == this || o.IsDead) continue;
+            Vector3 d = o.transform.position - pos; d.y = 0f;
+            float f = Vector3.Dot(d, fwd);
+            if (f <= 0f || f > lookAhead) continue;
+            if (Mathf.Abs(Vector3.Dot(d, right)) > laneWidth) continue;
+            Vector3 of = o.transform.forward; of.y = 0f;
+            bool same = Vector3.Dot(of, fwd) > 0.5f;
+            if (!same && o.GetInstanceID() > myId) continue; // 엇갈리는 차는 ID가 작은 쪽에게만 양보
+            float gap = f - (length + o.length) * 0.5f;
+            best = Mathf.Min(best, Mathf.Clamp01((gap - stopGap) / Mathf.Max(0.1f, followGap - stopGap)));
+        }
+        return best;
+    }
+
     Vector3 gridOrigin; float pitch; int maxI, maxJ;
     int ci, cj, ti, tj, prevI = -1, prevJ = -1;
     float t;                 // 현재 구간(ci,cj → ti,tj)에서 진행 비율
@@ -31,6 +67,7 @@ public class TrafficCar : MonoBehaviour
         gridOrigin = city.transform.position - new Vector3(sizeX, 0, sizeZ) * 0.5f + new Vector3(city.roadWidth, 0, city.roadWidth) * 0.5f;
         maxI = city.blocksX; maxJ = city.blocksZ;
         ci = i; cj = j;
+        curSpeed = speed;
         PickNext();
         Vector3 dir = Dir();
         offset = Right(dir) * laneOffset;
@@ -68,7 +105,11 @@ public class TrafficCar : MonoBehaviour
         if (ti == ci && tj == cj) { PickNext(); return; }
         Vector3 a = Node(ci, cj), b = Node(ti, tj);
         float len = Vector3.Distance(a, b);
-        t += speed * Time.deltaTime / Mathf.Max(1f, len);
+        // 앞차·교차로 차량과 겹치지 않게 속도 조절 (0.1초마다 확인, 감속은 빠르게 · 가속은 천천히)
+        if (Time.time >= nextCheck) { nextCheck = Time.time + 0.1f + Random.value * 0.03f; limit = flee ? 1f : CheckAhead(); }
+        float want = speed * limit;
+        curSpeed = Mathf.MoveTowards(curSpeed, want, (want < curSpeed ? 80f : 25f) * Time.deltaTime);
+        t += curSpeed * Time.deltaTime / Mathf.Max(1f, len);
         if (t >= 1f)
         {
             prevI = ci; prevJ = cj; ci = ti; cj = tj;
