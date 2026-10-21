@@ -932047,7 +932047,7 @@ MonoBehaviour:
   fartRadiusRatio: 3.2
   gasDuration: 12
   healRatio: 0.3
-  smokeColor: {r: 0.82, g: 0.82, b: 0.84, a: 0.6}
+  smokeColor: {r: 1, g: 0.84, b: 0.72, a: 0.5}
   pipRange: 150
   pipSize: 110
 --- !u!114 &1623737812

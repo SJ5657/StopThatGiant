@@ -20,7 +20,7 @@ public class PotatoSacks : MonoBehaviour
     [Tooltip("방귀 범위 반경 = 거인 키 × 이 비율")] public float fartRadiusRatio = 3.2f;
     [Tooltip("가스가 남아 있는 시간(초)")] public float gasDuration = 12f;
     [Tooltip("먹었을 때 회복하는 HP (최대 HP 대비)")] [Range(0f, 1f)] public float healRatio = 0.3f;
-    [Tooltip("연막 색 (반투명)")] public Color smokeColor = new Color(0.82f, 0.82f, 0.84f, 0.6f);
+    [Tooltip("방귀 연막 색 (반투명 살색)")] public Color smokeColor = new Color(1f, 0.84f, 0.72f, 0.5f);
 
     class Pile { public GameObject root; public float born, radius; }
     readonly List<Pile> piles = new List<Pile>();
@@ -83,7 +83,7 @@ public class PotatoSacks : MonoBehaviour
         }
     }
 
-    // 방귀 연막: 넓게 퍼지는 회색 연기. 거인이 그 안에 있는 동안 적은 공격하지 못함 (GasCloud.GiantHidden). 먹으면 HP도 회복
+    // 방귀 연막: 넓게 퍼지는 반투명 살색 가스. 거인이 그 안에 있는 동안 적은 공격하지 못함 (GasCloud.GiantHidden). 먹으면 HP도 회복
     void Fart(GiantHealth hp)
     {
         float r = Mathf.Max(5f, hp.Height * fartRadiusRatio);
