@@ -5,7 +5,7 @@ using UnityEngine;
 // 고른 것이 못 나오면(최대 개수 등) 다른 것을 시도.
 public static class ItemDrops
 {
-    [Tooltip("건물 하나를 부술 때 아이템이 나올 확률")] public static float dropChance = 0.02f;
+    [Tooltip("건물 하나를 부술 때 아이템이 나올 확률")] public static float dropChance = 0.015f;
 
     public static int Spawned;      // 각 생성기가 실제로 하나 만들 때마다 올림
     static bool forcing;            // ItemDrops가 고른 생성기를 부르는 중 (각자 확률은 '켜짐/꺼짐'으로만 씀)

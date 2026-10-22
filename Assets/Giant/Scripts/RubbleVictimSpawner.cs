@@ -10,7 +10,7 @@ public class RubbleVictimSpawner : MonoBehaviour
     [Tooltip("동시에 있을 수 있는 깔린 사람 수")] public int maxAlive = 4;
     [Tooltip("구하지 않으면 이 시간(초) 뒤 사라짐")] public float lifetime = 45f;
     [Tooltip("거인 키 × 이 비율 안으로 다가가면 집음")] public float pickRangeRatio = 0.35f;
-    [Tooltip("깔린 뒤 이 시간(초)이 지나야 집을 수 있음 (건물을 부순 직후 바로 집히지 않게)")] public float grabDelay = 3f;
+    [Tooltip("깔린 뒤 이 시간(초)이 지나야 집을 수 있음 (건물을 부순 직후 바로 집히지 않게)")] public float grabDelay = 1.5f;
     public Color rubbleColor = new Color(0.55f, 0.53f, 0.5f);
 
     static Material rubbleMat;

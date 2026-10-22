@@ -127,7 +127,7 @@ public class TankAI : MonoBehaviour
     void Decide(Vector3 gp, float dist)
     {
         int bi = ci, bj = cj;
-        if (dist < minRange)
+        if (dist < minRange && !GasCloud.InSmoke(transform.position)) // 방귀 연막 안에서는 거인이 다가와도 도망가지 않음
         {
             // 도망: 거인에게서 가장 멀어지는 인접 교차로
             float best = dist;

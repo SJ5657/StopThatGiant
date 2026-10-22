@@ -119,6 +119,7 @@ public class PoliceUnit : MonoBehaviour
         Vector3 gp = g.transform.position;
         float dist = Flat(transform.position, gp);
         int alive = AliveOfficers;
+        bool dazed = GasCloud.InSmoke(transform.position); // 방귀 연막 안: 거인이 다가와도 도망가지 않고 그 자리에 있음
 
         switch (state)
         {
@@ -127,22 +128,23 @@ public class PoliceUnit : MonoBehaviour
                 {
                     if (alive == 0) { state = State.Leave; break; }
                     if (dist <= deployDistance * gs && dist > tooClose * gs) { Deploy(gp); break; }
-                    if (dist <= tooClose * gs) { state = State.Retreat; break; }
+                    if (dist <= tooClose * gs) { if (!dazed) state = State.Retreat; break; }
                     PickNode(gp, approach: true, gs);
                 }
                 break;
             case State.Deploy:
                 if (alive == 0) { state = State.Leave; break; }
-                if (dist < tooClose * gs || dist > reengage * gs) Board();
+                if ((dist < tooClose * gs && !dazed) || dist > reengage * gs) Board();
                 break;
             case State.Board:
                 bool allIn = true;
                 foreach (var o in officers) if (!o.dead && !o.fleeing && !o.inCar) allIn = false;
-                if (allIn) state = dist < deployDistance * gs ? State.Retreat : State.Drive;
+                if (allIn && !(dazed && dist < deployDistance * gs)) state = dist < deployDistance * gs ? State.Retreat : State.Drive;
                 break;
             case State.Retreat:
                 if (!moving)
                 {
+                    if (dazed) break;
                     if (dist >= deployDistance * gs * 1.05f && alive > 0) { state = State.Drive; break; }
                     PickNode(gp, approach: false, gs);
                 }
@@ -252,7 +254,8 @@ public class PoliceUnit : MonoBehaviour
             if (g && toG.magnitude < squash) { KillOfficer(o, true); continue; }
 
             Vector3 target = p; float speed = 0f, anim01 = 0f;
-            if (o.fleeing)
+            if (o.fleeing && GasCloud.InSmoke(p)) { } // 방귀 연막 안: 도망가지 않고 멈춰 있음
+            else if (o.fleeing)
             {
                 // 차를 잃은 경찰: 거인에게서 도망
                 target = p - toG.normalized * 10f; speed = run; anim01 = 1f;

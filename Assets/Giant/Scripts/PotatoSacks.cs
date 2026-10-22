@@ -14,7 +14,7 @@ public class PotatoSacks : MonoBehaviour
     [Tooltip("가방 하나 높이 = 거인 키 × 이 비율")] public float sackHeightRatio = 0.13f;
     public Vector2Int sacksPerPile = new Vector2Int(7, 11);
     [Tooltip("안 먹으면 이 시간(초) 뒤 사라짐")] public float lifetime = 60f;
-    [Tooltip("나온 뒤 이 시간(초)이 지나야 먹을 수 있음")] public float pickupDelay = 3f;
+    [Tooltip("나온 뒤 이 시간(초)이 지나야 먹을 수 있음")] public float pickupDelay = 1.5f;
 
     [Header("방귀")]
     [Tooltip("방귀 범위 반경 = 거인 키 × 이 비율")] public float fartRadiusRatio = 3.2f;

@@ -12,7 +12,7 @@ public class WaterPuddles : MonoBehaviour
     public int maxPuddles = 3;
     [Tooltip("웅덩이 반경 = 거인 키 × 이 비율")] public float radiusRatio = 0.3f;
     [Tooltip("이 시간(초) 뒤 마름")] public float lifetime = 45f;
-    [Tooltip("생기고 이 시간(초)이 지나야 미끄러짐")] public float armDelay = 1f;
+    [Tooltip("생기고 이 시간(초)이 지나야 미끄러짐")] public float armDelay = 0.5f;
     [Tooltip("넘어지는 모션 길이(초, 모션 원래 속도 기준)")] public float slipTime = 2.7f;
     [Tooltip("넘어지는 모션 재생 속도 배율 (클수록 빨리 넘어지고 빨리 일어남. 미끄러지는 거리는 그대로)")] public float slipSpeed = 1.5f;
     [Tooltip("미끄러지는 거리 배율 (1 = 모션만큼, 클수록 앞으로 멀리 미끄러짐)")] public float slideScale = 4.2f;

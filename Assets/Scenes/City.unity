@@ -931940,7 +931940,7 @@ MonoBehaviour:
   dropChance: 0
   sizeRatio: 0.15
   lifetime: 60
-  pickupDelay: 3
+  pickupDelay: 1.5
   crateColor: {r: 0.25, g: 0.9, b: 0.4, a: 1}
   healRatio: 1
   xpBoostSeconds: 60
@@ -932021,7 +932021,7 @@ MonoBehaviour:
   maxAlive: 4
   lifetime: 45
   pickRangeRatio: 0.35
-  grabDelay: 3
+  grabDelay: 1.5
   rubbleColor: {r: 0.55, g: 0.53, b: 0.5, a: 1}
   pipRange: 150
   pipSize: 110
@@ -932043,7 +932043,7 @@ MonoBehaviour:
   sackHeightRatio: 0.13
   sacksPerPile: {x: 7, y: 11}
   lifetime: 60
-  pickupDelay: 3
+  pickupDelay: 1.5
   fartRadiusRatio: 3.2
   gasDuration: 12
   healRatio: 0.3
@@ -932066,7 +932066,7 @@ MonoBehaviour:
   maxPuddles: 3
   radiusRatio: 0.3
   lifetime: 45
-  armDelay: 1
+  armDelay: 0.5
   slipTime: 2.7
   slipSpeed: 1.5
   slideScale: 4.2
@@ -1060067,6 +1060067,66 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1842303865}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &1842801160
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1842801162}
+  - component: {fileID: 1842801161}
+  m_Layer: 0
+  m_Name: Flagpoles
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1842801161
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1842801160}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b4ca7b53e5fff784987c4910751f9a26, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  count: 24
+  heightRatio: {x: 0.95, y: 1.15}
+  thicknessRatio: 0.022
+  flagSizeRatio: 0.45
+  minDistanceFromStart: 80
+  poleColor: {r: 0.86, g: 0.87, b: 0.9, a: 1}
+  finialColor: {r: 0.95, g: 0.78, b: 0.25, a: 1}
+  pickRangeRatio: 0.15
+  reachTime: 0.22
+  liftTime: 0.25
+  gripAt: 0.15
+  swingLayer: Swing
+  swingSpeed: 1.2
+  poleAxisEuler: {x: 0, y: 0, z: 0}
+  hitRadiusRatio: 0.16
+  holdTime: 12
+--- !u!4 &1842801162
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1842801160}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1842868407
 GameObject:
   m_ObjectHideFlags: 0
@@ -1234367,3 +1234427,4 @@ SceneRoots:
   - {fileID: 1534904503}
   - {fileID: 475021570}
   - {fileID: 1528383185}
+  - {fileID: 1842801162}

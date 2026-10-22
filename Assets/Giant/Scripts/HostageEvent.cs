@@ -87,9 +87,11 @@ public class HostageEvent : MonoBehaviour
         return true;
     }
 
-    const AvatarIKGoal Goal = AvatarIKGoal.RightHand;
-    const AvatarIKHint Elbow = AvatarIKHint.RightElbow;
-    const HumanBodyBones HandBone = HumanBodyBones.RightHand, GripBone = HumanBodyBones.RightMiddleProximal, UpperArm = HumanBodyBones.RightUpperArm;
+    // 인질을 쥐는 손: 왼손 (오른손은 국기 게양대 무기용). S = -1 이면 왼손 → 좌우가 바뀌는 방향·회전은 모두 S를 곱해 거울처럼 뒤집음
+    const float S = -1f;
+    const AvatarIKGoal Goal = AvatarIKGoal.LeftHand;
+    const AvatarIKHint Elbow = AvatarIKHint.LeftElbow;
+    const HumanBodyBones HandBone = HumanBodyBones.LeftHand, GripBone = HumanBodyBones.LeftMiddleProximal, UpperArm = HumanBodyBones.LeftUpperArm;
 
     void Awake() { Instance = this; }
 
@@ -431,8 +433,8 @@ public class HostageEvent : MonoBehaviour
     }
 
     // ───────────── 손 IK ─────────────
-    // 인질을 "손바닥을 위로 한 채 손가락을 살짝 오므려 받쳐 든" 자세로 듦: 손 방향(회전)까지 IK로 맞추고, 손가락을 구부리고,
-    // 인질은 손바닥 한가운데 표면에 발을 붙여 세움. 이 리그의 손 뼈 축: 손가락 +X, 손바닥(바깥 법선) -Y, 엄지쪽 +Z.
+    // 인질을 손가락으로 감싸 쥔 자세로 듦: 손 방향(회전)까지 IK로 맞추고, 손가락을 구부리고,
+    // 인질은 쥔 손 안에 세움. 이 리그의 손 뼈 축: 손가락 +X(오른손) / -X(왼손), 손바닥(바깥 법선) -Y, 엄지쪽 +Z.
     Vector3 Bone(HumanBodyBones b, Vector3 fallback)
     {
         var tr = anim ? anim.GetBoneTransform(b) : null;
@@ -456,7 +458,7 @@ public class HostageEvent : MonoBehaviour
         Vector3 f = Vector3.ProjectOnPlane(fingerDir, n);
         if (f.sqrMagnitude < 1e-4f) f = Vector3.ProjectOnPlane(Vector3.forward, n);
         f.Normalize();
-        Vector3 y = -n, z = Vector3.Cross(f, y);
+        Vector3 y = -n, z = Vector3.Cross(f * S, y); // 왼손은 손가락이 -X라서 엄지(+Z) 방향이 거울처럼 뒤집힘
         return Quaternion.LookRotation(z, y);
     }
 
@@ -465,16 +467,16 @@ public class HostageEvent : MonoBehaviour
     {
         float s = ModelScale;
         Vector3 chest = Bone(HumanBodyBones.Chest, Bone(HumanBodyBones.Spine, hp.transform.position + Vector3.up * s));
-        return chest + hp.transform.forward * 0.32f * s + hp.transform.right * 0.1f * s - Vector3.up * 0.12f * s;
+        return chest + hp.transform.forward * 0.32f * s + hp.transform.right * 0.1f * S * s - Vector3.up * 0.12f * s;
     }
 
     Vector3 FlatForward() { Vector3 f = hp.transform.forward; f.y = 0f; return f.sqrMagnitude > 0.01f ? f.normalized : Vector3.forward; }
-    // 인질이 바라보는 방향 = 확대 화면 카메라가 있는 쪽: 쥔 손의 손바닥이 향하는 거인 왼쪽 앞
-    Vector3 FaceDir() { Vector3 d = -hp.transform.right + hp.transform.forward * 0.35f; d.y = 0f; return d.normalized; }
-    // 인질을 쥐는 자세: 팔을 앞으로, 엄지가 위를 향하고 손바닥이 몸 안쪽(왼쪽)을 보게 해서 세로로 선 인질을 손가락으로 감쌈
-    Quaternion CarryRotation() => HandRotation(FlatForward(), (-hp.transform.right + Vector3.up * 0.2f).normalized);
+    // 인질이 바라보는 방향 = 확대 화면 카메라가 있는 쪽: 쥔 손의 손바닥이 향하는 몸 안쪽 앞
+    Vector3 FaceDir() { Vector3 d = -S * hp.transform.right + hp.transform.forward * 0.35f; d.y = 0f; return d.normalized; }
+    // 인질을 쥐는 자세: 팔을 앞으로, 엄지가 위를 향하고 손바닥이 몸 안쪽을 보게 해서 세로로 선 인질을 손가락으로 감쌈
+    Quaternion CarryRotation() => HandRotation(FlatForward(), (-S * hp.transform.right + Vector3.up * 0.2f).normalized);
 
-    // IK 손 회전 목표와 실제 손 뼈 축 사이의 고정 보정 (이 VRM 리그는 측정해 보니 손 뼈가 IK 목표보다 Y축으로 -90° 돌아가 있음)
+    // IK 손 회전 목표와 실제 손 뼈 축 사이의 고정 보정 (오른손 기준으로 측정한 값: 손 뼈가 IK 목표보다 Y축으로 -90° 돌아가 있음. 왼손은 거울로 뒤집어 씀)
     [Tooltip("IK 손 회전 보정 (오일러). 손이 90° 돌아가 보이면 이 값을 조정")] public Vector3 ikRotOffsetEuler = new Vector3(0f, 90f, 0f);
 
     // GiantIKRelay가 매 프레임 호출 (GiantEat 다음)
@@ -531,11 +533,11 @@ public class HostageEvent : MonoBehaviour
         a.SetIKPositionWeight(Goal, w);
         a.SetIKPosition(Goal, palm - palmOffset);
         a.SetIKRotationWeight(Goal, w);
-        a.SetIKRotation(Goal, rot * Quaternion.Euler(ikRotOffsetEuler));
+        a.SetIKRotation(Goal, rot * Quaternion.Euler(ikRotOffsetEuler.x, ikRotOffsetEuler.y * S, ikRotOffsetEuler.z * S));
 
         Vector3 shoulder = Bone(UpperArm, hp.transform.position + Vector3.up * s);
         a.SetIKHintPositionWeight(Elbow, w * 0.8f);
-        a.SetIKHintPosition(Elbow, shoulder + hp.transform.right * 0.25f * s - Vector3.up * 0.3f * s - hp.transform.forward * 0.05f * s);
+        a.SetIKHintPosition(Elbow, shoulder + hp.transform.right * 0.25f * S * s - Vector3.up * 0.3f * s - hp.transform.forward * 0.05f * s);
         if (phase == Phase.Reach && (car || (victimMode && victim)))
         {
             a.SetLookAtWeight(Smooth(t) * 0.9f, 0.3f, 1f);
@@ -570,16 +572,16 @@ public class HostageEvent : MonoBehaviour
         a.SetIKPosition(foot, p); a.SetIKRotation(foot, r);
     }
 
-    // 손가락 구부리기: 손바닥을 덮는 방향(-Z 회전)으로 마디마다 조금씩 (검지~새끼, 엄지 제외)
+    // 손가락 구부리기: 손바닥을 덮는 방향(오른손 -Z, 왼손 +Z 회전)으로 마디마다 조금씩 (검지~새끼, 엄지 제외)
     static readonly HumanBodyBones[] CurlBones =
     {
-        HumanBodyBones.RightIndexProximal, HumanBodyBones.RightIndexIntermediate, HumanBodyBones.RightIndexDistal,
-        HumanBodyBones.RightMiddleProximal, HumanBodyBones.RightMiddleIntermediate, HumanBodyBones.RightMiddleDistal,
-        HumanBodyBones.RightRingProximal, HumanBodyBones.RightRingIntermediate, HumanBodyBones.RightRingDistal,
-        HumanBodyBones.RightLittleProximal, HumanBodyBones.RightLittleIntermediate, HumanBodyBones.RightLittleDistal,
+        HumanBodyBones.LeftIndexProximal, HumanBodyBones.LeftIndexIntermediate, HumanBodyBones.LeftIndexDistal,
+        HumanBodyBones.LeftMiddleProximal, HumanBodyBones.LeftMiddleIntermediate, HumanBodyBones.LeftMiddleDistal,
+        HumanBodyBones.LeftRingProximal, HumanBodyBones.LeftRingIntermediate, HumanBodyBones.LeftRingDistal,
+        HumanBodyBones.LeftLittleProximal, HumanBodyBones.LeftLittleIntermediate, HumanBodyBones.LeftLittleDistal,
     };
     static readonly float[] CurlAngles = { 55f, 70f, 45f };   // 마디별 최대 굽힘 (손바닥 쪽으로 쥐는 정도)
-    [Tooltip("손가락 구부림 방향 (-1 / +1, 반대로 구부러지면 부호를 바꿈)")] public float curlSign = -1f;
+    [Tooltip("손가락 구부림 방향 (오른손 기준 -1 / +1, 반대로 구부러지면 부호를 바꿈. 왼손은 자동으로 뒤집힘)")] public float curlSign = -1f;
     [Tooltip("손으로 쥐는 정도 (1 = 기본, 0 = 펴짐)")] [Range(0f, 1.5f)] public float gripStrength = 1f;
     [Tooltip("쥔 손 안에서 인질 몸통 중심이 손바닥 면에서 떨어진 거리 (손 길이 대비)")] public float gripDepth = 0.2f;
     [Tooltip("인질이 쥐어지는 높이 (발 기준, 인질 키 대비. 0.55 = 허리·가슴 부근을 쥐고 머리가 위로 나옴)")] public float gripHeight = 0.55f;
@@ -593,17 +595,17 @@ public class HostageEvent : MonoBehaviour
         for (int i = 0; i < CurlBones.Length; i++)
         {
             var b = anim.GetBoneTransform(CurlBones[i]);
-            if (b) b.localRotation = b.localRotation * Quaternion.Euler(0f, 0f, curlSign * CurlAngles[i % 3] * amount);
+            if (b) b.localRotation = b.localRotation * Quaternion.Euler(0f, 0f, curlSign * S * CurlAngles[i % 3] * amount);
         }
         // 엄지: 뿌리를 손바닥 쪽으로 모으고 마디를 구부려 인질을 감싸는 손가락들과 맞물리게 함
         var hand = HandT;
         if (!hand) return;
-        var tp = anim.GetBoneTransform(HumanBodyBones.RightThumbProximal);
-        var ti = anim.GetBoneTransform(HumanBodyBones.RightThumbIntermediate);
-        var td = anim.GetBoneTransform(HumanBodyBones.RightThumbDistal);
+        var tp = anim.GetBoneTransform(HumanBodyBones.LeftThumbProximal);
+        var ti = anim.GetBoneTransform(HumanBodyBones.LeftThumbIntermediate);
+        var td = anim.GetBoneTransform(HumanBodyBones.LeftThumbDistal);
         if (tp) tp.rotation = Quaternion.AngleAxis(thumbOpposeDeg * amount, hand.right) * tp.rotation;
-        if (ti) ti.rotation = Quaternion.AngleAxis(thumbCurlDeg * amount, hand.forward) * ti.rotation;
-        if (td) td.rotation = Quaternion.AngleAxis(thumbCurlDeg * amount, hand.forward) * td.rotation;
+        if (ti) ti.rotation = Quaternion.AngleAxis(thumbCurlDeg * S * amount, hand.forward) * ti.rotation;
+        if (td) td.rotation = Quaternion.AngleAxis(thumbCurlDeg * S * amount, hand.forward) * td.rotation;
     }
 
     // IK가 끝난 손바닥에 차량·인질을 붙임

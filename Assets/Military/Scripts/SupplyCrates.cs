@@ -12,7 +12,7 @@ public class SupplyCrates : MonoBehaviour
     [Tooltip("건물을 하나 부술 때 상자가 나올 확률 (0.01 = 1%)")] [Range(0f, 1f)] public float dropChance = 0.01f;
     [Tooltip("상자 한 변 = 거인 키 × 이 비율")] public float sizeRatio = 0.15f;
     [Tooltip("먹지 않고 이 시간(초)이 지나면 사라짐")] public float lifetime = 60f;
-    [Tooltip("나온 뒤 이 시간(초)이 지나야 먹을 수 있음")] public float pickupDelay = 3f;
+    [Tooltip("나온 뒤 이 시간(초)이 지나야 먹을 수 있음")] public float pickupDelay = 1.5f;
     public Color crateColor = new Color(0.25f, 0.9f, 0.4f);
 
     [Header("효과")]

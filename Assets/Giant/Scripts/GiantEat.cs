@@ -117,9 +117,10 @@ public class GiantEat : MonoBehaviour
             if (d.sqrMagnitude < bestD) { bestD = d.sqrMagnitude; best = c; }
         }
         if (!best) return;
-        target = best;
-        // 시민이 있는 쪽 손으로 (왼손에 새장을 들고 있으면 오른손으로)
+        // 시민이 있는 쪽 손으로 (왼손에 새장을 들고 있으면 오른손, 오른손에 국기 게양대를 들고 있으면 왼손. 둘 다면 못 먹음)
         bool right = CageSkill.HoldingCage || Vector3.Dot(best.transform.position - transform.position, transform.right) >= 0f;
+        if (Flagpoles.RightHandBusy) { if (CageSkill.HoldingCage) return; right = false; }
+        target = best;
         side = right ? 1f : -1f;
         goal = right ? AvatarIKGoal.RightHand : AvatarIKGoal.LeftHand;
         elbowHint = right ? AvatarIKHint.RightElbow : AvatarIKHint.LeftElbow;
