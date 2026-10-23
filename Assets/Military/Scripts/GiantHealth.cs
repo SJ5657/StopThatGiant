@@ -5,7 +5,7 @@ using UnityEngine.SceneManagement;
 public class GiantHealth : MonoBehaviour
 {
     public static GiantHealth Instance { get; private set; }
-    public float maxHP = 300f;
+    public float maxHP = 400f;
     [Tooltip("테스트용: 켜면 HP가 0이 되어도 죽지 않음")] public bool testNoDeath = false;
     [Header("능력치")]
     [Tooltip("초당 HP 자동 회복량")] public float hpRegen = 0f;

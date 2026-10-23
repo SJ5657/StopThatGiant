@@ -14,8 +14,8 @@ public class LevelSystem : MonoBehaviour
     [Tooltip("경험치 획득 배율")] public float xpMultiplier = 1f;
 
     [Header("게이지")]
-    [Range(0.2f, 1f)] public float barWidthRatio = 0.5f;
-    public float barHeight = 14f;
+    [Range(0.2f, 1f)] public float barWidthRatio = 0.4f;
+    public float barHeight = 12f;
     public float bottomMargin = 26f;
 
     public int Level { get; private set; } = 1;
@@ -74,14 +74,14 @@ public class LevelSystem : MonoBehaviour
         GUI.DrawTexture(new Rect(x, y, w * displayFill, h), Texture2D.whiteTexture);
 
         // 레벨 표시 (게이지 왼쪽)
-        var lvStyle = new GUIStyle(GUI.skin.label) { fontSize = 18, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleRight };
+        var lvStyle = new GUIStyle(GUI.skin.label) { fontSize = 16, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleRight };
         GUI.color = new Color(0, 0, 0, 0.7f);
         GUI.Label(new Rect(x - 92 + 1, y - 8 + 1, 80, h + 16), $"LV {Level}", lvStyle);
         GUI.color = Color.Lerp(Color.white, new Color(0.5f, 0.85f, 1f), flash);
         GUI.Label(new Rect(x - 92, y - 8, 80, h + 16), $"LV {Level}", lvStyle);
 
         // 경험치 수치 (게이지 안)
-        var xpStyle = new GUIStyle(GUI.skin.label) { fontSize = 11, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
+        var xpStyle = new GUIStyle(GUI.skin.label) { fontSize = 10, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
         GUI.color = Color.white;
         string xpText = Level >= maxLevel ? "MAX" : $"{Xp:N0} / {XpToNext:N0} XP";
         GUI.Label(new Rect(x, y - 3, w, h + 6), xpText, xpStyle);

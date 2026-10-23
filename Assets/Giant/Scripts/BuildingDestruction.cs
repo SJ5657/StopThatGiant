@@ -26,7 +26,7 @@ public class BuildingDestruction : MonoBehaviour
 
     [Header("건물 체력 (거인 공격)")]
     [Tooltip("건물이 무너지기까지 맞아야 하는 횟수 (건물 크기와 상관없이 같음)")] [Min(1)] public int hitsToBreak = 2;
-    [Tooltip("거인 키의 이 비율 이하인 작은 건물은 한 번에 무너짐 (0.15 = 거인 키의 15%)")] [Range(0f, 1f)] public float oneHitHeightRatio = 0.15f;
+    [Tooltip("건물 높이가 거인 키의 이 비율 미만이면 한 번에 무너짐 (0.2 = 거인 키의 20%)")] [Range(0f, 1f)] public float oneHitHeightRatio = 0.2f;
     [Tooltip("이만큼 떨어져 있다가 다시 닿으면 '새로 지나감'으로 보고 피해 (초)")] public float reTouchGap = 0.3f;
     [Tooltip("계속 닿아 있을 때 반복 피해 간격 (초)")] public float repeatInterval = 1f;
     [Tooltip("다 부서지기 직전 땅으로 꺼지는 정도 (건물 높이 비율)")] [Range(0, 1)] public float maxSink = 0.35f;
@@ -174,9 +174,9 @@ public class BuildingDestruction : MonoBehaviour
         while (t.parent && t.parent.gameObject.layer == building.layer) t = t.parent;
         if (!t.gameObject.activeInHierarchy) return;
 
-        // 거인 키 대비 작은 건물(기본 20% 이하)은 한 번에 무너짐
+        // 거인 키 대비 작은 건물(oneHitHeightRatio 미만)은 한 번에 무너짐
         var giant = GiantHealth.Instance;
-        if (giant && giant.Height > 1f && t.lossyScale.y <= giant.Height * Instance.oneHitHeightRatio) { Break(t.gameObject, hitPoint, push); return; }
+        if (giant && giant.Height > 1f && t.lossyScale.y < giant.Height * Instance.oneHitHeightRatio) { Break(t.gameObject, hitPoint, push); return; }
 
         var hp = t.GetComponent<BuildingHealth>();
         if (!hp)

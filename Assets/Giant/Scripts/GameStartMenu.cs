@@ -13,6 +13,8 @@ public class GameStartMenu : MonoBehaviour
 {
     public static GameStartMenu Instance { get; private set; }
     public static bool InMenu => Instance != null && Instance.state != State.Playing;
+    // 성별 선택 화면 (거인을 정면에서 크게 보여줌)
+    public static bool InSelect => Instance != null && Instance.state == State.Select;
     // 게임 중 HUD(점수·돈·아이템·새장 등)를 숨김. 시작 메뉴·상점 등 조작 화면은 그대로
     public static bool HideHud = true;
 
@@ -54,6 +56,15 @@ public class GameStartMenu : MonoBehaviour
     // 지금 고른 성별 (세이브용)
     public static int CurrentChoice => Instance != null && Instance.selected >= 0 ? Instance.selected : Mathf.Max(0, lastChoice);
     bool pendingInfinite; // 시작 화면에서 고른 모드 (성별 선택 후 시작할 때 확정)
+
+    // ───── 설정 (시작 화면의 '설정' 버튼) ─────
+    // 스트리머 모드: 켜면 거인의 중요 부위를 검은 사각형으로 가림 (StreamerCensor). 다음 실행 때도 유지 (PlayerPrefs)
+    public static bool StreamerMode
+    {
+        get => PlayerPrefs.GetInt("StreamerMode", 0) == 1;
+        set { PlayerPrefs.SetInt("StreamerMode", value ? 1 : 0); PlayerPrefs.Save(); }
+    }
+    bool settingsOpen;
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     static void ResetStatics() { lastChoice = -1; lastInfinite = false; InfiniteMode = false; }
 
@@ -223,7 +234,11 @@ public class GameStartMenu : MonoBehaviour
         if (Time.timeScale != 0f) Time.timeScale = 0f;
         if (Time.unscaledTime - stateAt < 0.2f) return;
 
-        if (state == State.Title)
+        if (state == State.Title && settingsOpen)
+        {
+            if (Input.GetKeyDown(KeyCode.Escape)) settingsOpen = false;
+        }
+        else if (state == State.Title)
         {
             if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter) || Input.GetKeyDown(KeyCode.Space)) { pendingInfinite = false; GoSelect(); }
         }
@@ -352,13 +367,48 @@ public class GameStartMenu : MonoBehaviour
             Style(Mathf.RoundToInt(H * 0.028f), FontStyle.Bold, TextAnchor.MiddleLeft), new Color(1f, 1f, 1f, 0.9f * fade));
 
         float bw = Mathf.Clamp(W * 0.22f, 240f, 340f), bh = Mathf.Clamp(H * 0.075f, 48f, 72f);
-        float y = H * 0.5f;
+        float y = H * 0.45f;
+        if (settingsOpen) { DrawSettings(W, H, fade); return; }
         if (MenuButton(new Rect(x, y, bw, bh), "게임 시작", new Color(1f, 0.55f, 0.15f), true, fade)) { pendingInfinite = false; GoSelect(); return; }
         if (MenuButton(new Rect(x, y + bh * 1.3f, bw, bh), "무한모드", new Color(0.55f, 0.4f, 1f), true, fade)) { pendingInfinite = true; GoSelect(); return; }
-        if (MenuButton(new Rect(x, y + bh * 2.6f, bw, bh), "게임 종료", new Color(0.42f, 0.45f, 0.52f), true, fade)) { Quit(); return; }
+        if (MenuButton(new Rect(x, y + bh * 2.6f, bw, bh), "설정", new Color(0.25f, 0.62f, 0.55f), true, fade)) { settingsOpen = true; return; }
+        if (MenuButton(new Rect(x, y + bh * 3.9f, bw, bh), "게임 종료", new Color(0.42f, 0.45f, 0.52f), true, fade)) { Quit(); return; }
 
         ShadowLabel(new Rect(x, H - 50, W * 0.5f, 30), "Enter : 게임 시작",
             Style(14, FontStyle.Normal, TextAnchor.MiddleLeft), new Color(1, 1, 1, 0.6f * fade));
+    }
+
+    // 설정 창: 가운데 패널 + 체크박스 목록 + 닫기
+    void DrawSettings(float W, float H, float fade)
+    {
+        float pw = Mathf.Clamp(W * 0.36f, 380f, 520f), ph = Mathf.Clamp(H * 0.42f, 260f, 360f);
+        var panel = new Rect(W * 0.5f - pw * 0.5f, H * 0.5f - ph * 0.5f, pw, ph);
+        Box(new Rect(panel.x - 3, panel.y - 3, panel.width + 6, panel.height + 6), new Color(0f, 0f, 0f, 0.7f * fade));
+        Box(panel, new Color(0.13f, 0.14f, 0.17f, 0.95f * fade));
+        ShadowLabel(new Rect(panel.x, panel.y + 14, panel.width, 44), "설정",
+            Style(Mathf.RoundToInt(Mathf.Clamp(H * 0.045f, 26f, 40f)), FontStyle.Bold, TextAnchor.MiddleCenter), new Color(1f, 0.82f, 0.28f, fade));
+
+        float rowY = panel.y + 80;
+        bool on = StreamerMode;
+        if (Checkbox(new Rect(panel.x + 30, rowY, panel.width - 60, 40), "스트리머 모드", on, fade)) StreamerMode = !on;
+        ShadowLabel(new Rect(panel.x + 30 + 44, rowY + 40, panel.width - 104, 44), "거인의 중요 부위를 검은 사각형으로 가립니다.",
+            Style(14, FontStyle.Normal, TextAnchor.UpperLeft), new Color(1f, 1f, 1f, 0.7f * fade));
+
+        float bw = 180f, bh = 50f;
+        if (MenuButton(new Rect(panel.center.x - bw * 0.5f, panel.yMax - bh - 22, bw, bh), "닫기", new Color(0.42f, 0.45f, 0.52f), true, fade)) settingsOpen = false;
+    }
+
+    // 체크박스 한 줄 (칸 + 이름). 클릭하면 true
+    bool Checkbox(Rect r, string label, bool value, float alpha)
+    {
+        bool hov = r.Contains(Event.current.mousePosition);
+        var box = new Rect(r.x, r.y + (r.height - 30) * 0.5f, 30, 30);
+        Box(new Rect(box.x - 2, box.y - 2, box.width + 4, box.height + 4), new Color(1f, 1f, 1f, (hov ? 0.9f : 0.6f) * alpha));
+        Box(box, new Color(0.08f, 0.08f, 0.1f, alpha));
+        if (value) Box(new Rect(box.x + 6, box.y + 6, box.width - 12, box.height - 12), new Color(0.35f, 0.85f, 0.6f, alpha));
+        ShadowLabel(new Rect(box.xMax + 14, r.y, r.width - 44, r.height), label,
+            Style(20, FontStyle.Bold, TextAnchor.MiddleLeft), new Color(1f, 1f, 1f, alpha));
+        return GUI.Button(r, GUIContent.none, GUIStyle.none);
     }
 
     void DrawPause(float W, float H, float fade)

@@ -52,6 +52,29 @@ public class GiantController : MonoBehaviour
         }
     }
 
+    // 캐릭터 윤곽선 (MToon 외곽선, 건물 윤곽선처럼 진한 색). 월드 좌표 두께라서 거인 크기에 비례해서 굵게
+    // (MToon의 화면 좌표 모드는 카메라가 멀면 가늘어져 이 게임의 먼 카메라에선 안 보임)
+    [Header("윤곽선")]
+    [Tooltip("윤곽선 두께 = 거인 크기(GameScale) × 이 값 (m). 0이면 윤곽선 없음")] public float outlineWidthPerScale = 0.011f;
+    public Color outlineColor = new Color(0.12f, 0.1f, 0.12f, 1f);
+
+    void ApplyOutline(float gameScale)
+    {
+        float w = outlineWidthPerScale * gameScale;
+        foreach (var r in GetComponentsInChildren<Renderer>(true))
+            foreach (var m in r.materials)
+            {
+                if (!m || !m.HasProperty("_OutlineWidthMode") || !(m.name.Contains("_SKIN") || m.name.Contains("_HAIR"))) continue; // 피부·머리카락만 (눈·입 등은 제외)
+                bool on = w > 0f;
+                m.SetFloat("_OutlineWidthMode", on ? 1f : 0f); // 1 = 월드 좌표
+                m.SetFloat("_OutlineWidth", w);
+                m.SetColor("_OutlineColor", outlineColor);
+                if (m.HasProperty("_OutlineLightingMix")) m.SetFloat("_OutlineLightingMix", 0f); // 그늘에서도 같은 색
+                if (on) m.EnableKeyword("_MTOON_OUTLINE_WORLD"); else m.DisableKeyword("_MTOON_OUTLINE_WORLD");
+                m.DisableKeyword("_MTOON_OUTLINE_SCREEN");
+            }
+    }
+
     void Awake()
     {
         Instance = this;
@@ -96,6 +119,7 @@ public class GiantController : MonoBehaviour
         cc.stepOffset = Mathf.Min(ccStepPer * gs, cc.height * 0.5f);
         cc.skinWidth = Mathf.Clamp(cc.radius * 0.1f, 0.0005f, 0.08f); // 아주 작아졌을 때(축소빔) 캡슐보다 두꺼운 스킨 방지. 보통 크기에선 기본값 0.08 그대로
         cc.minMoveDistance = Mathf.Min(0.001f, cc.radius * 0.01f);
+        ApplyOutline(gs);
     }
 
     // 모델이 바뀌면(성별 선택) 애니메이터 다시 찾고, 모델 키에 맞춰 충돌 캡슐 높이 조정

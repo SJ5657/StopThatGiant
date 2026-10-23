@@ -12,7 +12,7 @@ public class Flagpoles : MonoBehaviour
     public static bool RightHandBusy => Instance && Instance.phase != Phase.None;
 
     [Header("배치")]
-    [Tooltip("도시에 세우는 게양대 수")] public int count = 24;
+    [Tooltip("도시에 세우는 게양대 수")] public int count = 26;
     [Tooltip("게양대 길이 = 거인 키 × 이 범위")] public Vector2 heightRatio = new Vector2(0.95f, 1.15f);
     [Tooltip("게양대 굵기(반지름) = 길이 × 이 비율")] public float thicknessRatio = 0.022f;
     [Tooltip("깃발 가로 길이 = 게양대 길이 × 이 비율 (세로는 가로의 2/3)")] public float flagSizeRatio = 0.45f;
@@ -32,6 +32,7 @@ public class Flagpoles : MonoBehaviour
     [Tooltip("손 뼈 기준 게양대 방향 보정 (오일러). 0 = 엄지 쪽(+Z)으로 뻗음")] public Vector3 poleAxisEuler = Vector3.zero;
     [Tooltip("게양대에 맞는 판정 굵기 = 거인 키 × 이 비율")] public float hitRadiusRatio = 0.16f;
     [Tooltip("손에 들고 이 시간(초)이 지나면 게양대가 부러져 사라짐")] public float holdTime = 12f;
+    [Tooltip("건물을 부수는 판정 굵기 = 거인 키 × 이 비율 (게양대 둘레로 이만큼 닿는 건물이 부서짐)")] public float buildingHitRatio = 0.25f;
 
     class Pole
     {
@@ -350,7 +351,64 @@ public class Flagpoles : MonoBehaviour
             hitThisSwing.Add(e.c);
             Smash(e);
         }
+        BreakBuildings(a, b, s, yawPrev, sweep, far);
         prevA = a; prevB = b;
+    }
+
+    // 휘두르는 게양대(손보다 바깥쪽 부분)에 닿은 건물을 부숨. 부술 수 없는 초고층도 게양대에 맞으면 무너짐
+    readonly Collider[] buildingHits = new Collider[64];
+    readonly HashSet<GameObject> brokenNow = new HashSet<GameObject>();
+    void BreakBuildings(Vector3 a, Vector3 b, Vector3 s, float yawPrev, float sweep, float far)
+    {
+        var tall = TallBuildings.Instance;
+        int buildingLayer = LayerMask.NameToLayer("Building");
+        int mask = LayerMask.GetMask("Building") | (tall ? LayerMask.GetMask(tall.solidLayerName) : 0);
+        float r = Mathf.Max(2f, H * buildingHitRatio);
+        Vector3 push = FlatDir(b - prevB);
+        brokenNow.Clear();
+        for (int k = 0; k <= 2; k++)
+        {
+            float u = k / 2f;
+            Vector3 pa = Vector3.Lerp(prevA, a, u), pb = Vector3.Lerp(prevB, b, u);
+            Vector3 from = Vector3.Lerp(pa, pb, gripAt + 0.15f); // 손 근처는 빼고 바깥쪽만
+            int n = Physics.OverlapCapsuleNonAlloc(from, pb, r, buildingHits, mask, QueryTriggerInteraction.Ignore);
+            for (int i = 0; i < n; i++)
+            {
+                var c = buildingHits[i];
+                if (!c) continue;
+                if (c.gameObject.layer == buildingLayer)
+                {
+                    Transform t = c.transform;
+                    while (t.parent && t.parent.gameObject.layer == buildingLayer) t = t.parent; // 건물 본체
+                    if (!t.gameObject.activeInHierarchy || !brokenNow.Add(t.gameObject)) continue;
+                    BuildingDestruction.Break(t.gameObject, c.ClosestPoint(pb), push);
+                }
+                else if (tall)
+                {
+                    Transform t = tall.SolidRoot(c); // 땅·인도 등은 null
+                    if (!t || !brokenNow.Add(t.gameObject)) continue;
+                    tall.ForceBreak(t, c.ClosestPoint(pb), push);
+                }
+            }
+        }
+        // 게양대 아래(휘두르는 호 안, 게양대 끝이 닿는 거리 안)에 있는 낮은 건물도 함께 무너짐
+        Vector3 sf = new Vector3(s.x, 0f, s.z);
+        int m = Physics.OverlapSphereNonAlloc(sf, far + r, buildingHits, LayerMask.GetMask("Building"), QueryTriggerInteraction.Ignore);
+        for (int i = 0; i < m; i++)
+        {
+            var c = buildingHits[i];
+            if (!c) continue;
+            Transform t = c.transform;
+            while (t.parent && t.parent.gameObject.layer == buildingLayer) t = t.parent;
+            if (!t.gameObject.activeInHierarchy || brokenNow.Contains(t.gameObject)) continue;
+            Vector3 d = c.bounds.center - sf; d.y = 0f;
+            float rel = Mathf.DeltaAngle(yawPrev, YawOf(d));
+            bool crossed = sweep >= 0f ? rel >= -2f && rel <= sweep + 2f : rel <= 2f && rel >= sweep - 2f;
+            if (!crossed || d.magnitude > far + r * 0.5f) continue;
+            brokenNow.Add(t.gameObject);
+            BuildingDestruction.Break(t.gameObject, c.ClosestPoint(sf + Vector3.up * c.bounds.max.y), push);
+        }
+        if (brokenNow.Count > 0 && GiantCamera.Instance) GiantCamera.Instance.Shake(0.25f);
     }
 
     void Smash(Target e)
