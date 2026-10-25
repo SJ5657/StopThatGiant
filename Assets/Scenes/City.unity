@@ -1060394,7 +1060394,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b4ca7b53e5fff784987c4910751f9a26, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  count: 26
+  count: 20
   heightRatio: {x: 0.95, y: 1.15}
   thicknessRatio: 0.022
   flagSizeRatio: 0.45

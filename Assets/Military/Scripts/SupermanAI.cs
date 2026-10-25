@@ -23,11 +23,11 @@ public class SupermanAI : MonoBehaviour
     [Tooltip("쏘기 전에 멈춰서 거인을 바라보는 시간(초)")] public float aimTime = 0.35f;
     public float boltDamage = 14f;
     [Tooltip("레이저 탄 속도 (거인 키/초). 느릴수록 움직여서 피하기 쉬움")] public float boltSpeedRatio = 9f;
-    [Tooltip("돌진하기 전까지 쏘는 레이저 발 수 (최소, 최대). 돌진 공격이 끝날 때마다 새로 랜덤")] public Vector2Int shotsBeforeDash = new Vector2Int(0, 6);
+    [Tooltip("돌진하기 전까지 쏘는 레이저 발 수 (최소, 최대). 돌진 공격이 끝날 때마다 새로 랜덤")] public Vector2Int shotsBeforeDash = new Vector2Int(0, 8);
     public Color laserColor = new Color(1f, 0.12f, 0.08f, 1f);
 
     [Header("돌진")]
-    [Tooltip("연속 돌진 횟수 (모두 피하면 슈퍼맨이 날아가 버림)")] public int dashCount = 3;
+    [Tooltip("연속 돌진 횟수 (모두 피하면 슈퍼맨이 날아가 버림)")] public int dashCount = 4;
     [Tooltip("첫 돌진 전 기를 모으는 시간(초)")] public float windUpTime = 0.9f;
     [Tooltip("돌진을 피한 뒤 다음 돌진 전 기를 모으는 시간(초)")] public float nextWindUpTime = 0.6f;
     [Tooltip("돌진 직전 예상 경로가 보이는 시간(초)")] public float routeShowTime = 0.3f;

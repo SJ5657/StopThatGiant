@@ -1,7 +1,8 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-// 국기 그림: 이미지 파일 없이 코드로 픽셀을 칠해 만듦 (가로 3 : 세로 2). 한 번 만든 그림은 재사용.
+// 깃발 그림: 실제 나라 국기 대신 게임 속 가상의 단체·주(州)를 상징하는 깃발을 코드로 픽셀을 칠해 만듦 (가로 3 : 세로 2).
+// 이미지 파일 없음. 한 번 만든 그림은 재사용.
 public static class Flags
 {
     public struct Flag { public string name; public Texture2D tex; }
@@ -9,39 +10,38 @@ public static class Flags
     const int W = 120, Hgt = 80;
     delegate Color Painter(float x, float y); // x: 0(깃대 쪽)~1, y: 0(아래)~1
 
-    static readonly Color Red = new Color(0.8f, 0.08f, 0.13f), White = Color.white, Blue = new Color(0f, 0.22f, 0.6f),
-        Navy = new Color(0.04f, 0.13f, 0.4f), Yellow = new Color(1f, 0.82f, 0f), Green = new Color(0f, 0.55f, 0.27f),
-        Black = new Color(0.05f, 0.05f, 0.05f), Orange = new Color(1f, 0.53f, 0.1f), Sky = new Color(0.36f, 0.6f, 0.85f);
+    static readonly Color White = Color.white, Cream = new Color(0.96f, 0.92f, 0.8f), Black = new Color(0.07f, 0.07f, 0.08f),
+        Charcoal = new Color(0.2f, 0.21f, 0.24f), Silver = new Color(0.78f, 0.8f, 0.84f), Maroon = new Color(0.5f, 0.06f, 0.12f),
+        Red = new Color(0.82f, 0.12f, 0.15f), Orange = new Color(1f, 0.5f, 0.08f), Gold = new Color(0.98f, 0.76f, 0.15f),
+        Sand = new Color(0.9f, 0.78f, 0.52f), Terracotta = new Color(0.72f, 0.33f, 0.2f), Brown = new Color(0.4f, 0.24f, 0.12f),
+        Forest = new Color(0.08f, 0.38f, 0.2f), Lime = new Color(0.6f, 0.85f, 0.2f), Teal = new Color(0f, 0.5f, 0.52f),
+        Turquoise = new Color(0.1f, 0.75f, 0.75f), Sky = new Color(0.45f, 0.7f, 0.92f), Ice = new Color(0.75f, 0.9f, 1f),
+        Navy = new Color(0.06f, 0.12f, 0.35f), Space = new Color(0.04f, 0.04f, 0.16f), Purple = new Color(0.4f, 0.15f, 0.55f),
+        Pink = new Color(1f, 0.55f, 0.75f), Gray = new Color(0.45f, 0.47f, 0.5f);
 
     static readonly (string name, Painter paint)[] All =
     {
-        ("대한민국", Korea),
-        ("미국", Usa),
-        ("일본", (x, y) => Circle(x, y, 0.5f, 0.5f, 0.3f) ? Red : White),
-        ("중국", (x, y) => Star(x, y, 0.17f, 0.72f, 0.15f, 0f) || Star(x, y, 0.33f, 0.9f, 0.05f, 20f) || Star(x, y, 0.4f, 0.78f, 0.05f, 45f)
-                          || Star(x, y, 0.4f, 0.6f, 0.05f, 0f) || Star(x, y, 0.33f, 0.48f, 0.05f, 20f) ? Yellow : Red),
-        ("프랑스", (x, y) => V3(x, Blue, White, Red)),
-        ("이탈리아", (x, y) => V3(x, Green, White, Red)),
-        ("독일", (x, y) => H3(y, Black, Red, Yellow)),
-        ("러시아", (x, y) => H3(y, White, Blue, Red)),
-        ("네덜란드", (x, y) => H3(y, Red, White, Blue)),
-        ("우크라이나", (x, y) => y > 0.5f ? Blue : Yellow),
-        ("폴란드", (x, y) => y > 0.5f ? White : Red),
-        ("인도네시아", (x, y) => y > 0.5f ? Red : White),
-        ("벨기에", (x, y) => V3(x, Black, Yellow, Red)),
-        ("아일랜드", (x, y) => V3(x, Green, White, Orange)),
-        ("스웨덴", (x, y) => Nordic(x, y, Sky, Yellow)),
-        ("덴마크", (x, y) => Nordic(x, y, Red, White)),
-        ("핀란드", (x, y) => Nordic(x, y, White, Blue)),
-        ("스위스", (x, y) => (Mathf.Abs(x - 0.5f) < 0.06f && Mathf.Abs(y - 0.5f) < 0.3f) || (Mathf.Abs(y - 0.5f) < 0.09f && Mathf.Abs(x - 0.5f) < 0.2f) ? White : Red),
-        ("베트남", (x, y) => Star(x, y, 0.5f, 0.5f, 0.3f, 0f) ? Yellow : Red),
-        ("방글라데시", (x, y) => Circle(x, y, 0.45f, 0.5f, 0.3f) ? Red : Green),
-        ("브라질", Brazil),
-        ("튀르키예", (x, y) => (Circle(x, y, 0.37f, 0.5f, 0.25f) && !Circle(x, y, 0.43f, 0.5f, 0.2f)) || Star(x, y, 0.58f, 0.5f, 0.1f, -90f) ? White : Red),
-        ("오스트리아", (x, y) => H3(y, Red, White, Red)),
-        ("헝가리", (x, y) => H3(y, Red, White, Green)),
-        ("나이지리아", (x, y) => V3(x, Green, White, Green)),
-        ("그리스", Greece),
+        ("붉은매 연합", (x, y) => Star(x, y, 0.5f, 0.5f, 0.2f, 0f) ? White : Band(x, y, 0.09f) ? Gold : Maroon),
+        ("북부 해안주", (x, y) => Circle(x, y, 0.2f, 0.75f, 0.11f) && !Circle(x, y, 0.2f, 0.75f, 0.07f) ? White
+                            : y > 0.5f + Mathf.Sin(x * 14f) * 0.06f ? Navy : Teal),
+        ("은빛 늑대단", (x, y) => Chevron(x, y, 0.32f) ? Silver : Ring(x, y, 0.68f, 0.5f, 0.22f, 0.05f) ? Silver : Charcoal),
+        ("황금 태양 공화국", Sun),
+        ("청룡 기사단", (x, y) => Border(x, y, 0.07f) ? White : Diamond(x, y, 0.5f, 0.5f, 0.28f) ? Gold : Teal),
+        ("남부 사막주", (x, y) => Chevron(x, y, 0.38f) ? Brown : Circle(x, y, 0.72f, 0.66f, 0.12f) ? Gold : y > 0.42f ? Sand : Terracotta),
+        ("자유 항공 연맹", (x, y) => Star(x, y, 0.18f, 0.5f, 0.15f, 0f) ? Navy : Mathf.Abs(y - 0.5f) < 0.06f && x > 0.3f ? White : Sky),
+        ("강철 노동조합", Gear),
+        ("서부 산악주", Mountains),
+        ("보라별 동맹", (x, y) => Star(x, y, 0.5f, 0.5f, 0.17f, 0f) ? White : Saltire(x, y, 0.08f) ? Orange : Purple),
+        ("동방 무역회사", (x, y) => Circle(x, y, 0.5f, 0.5f, 0.18f) ? Red : (x < 0.5f) == (y > 0.5f) ? Teal : Cream),
+        ("거인 감시단", Eye),
+        ("은하 탐사대", Galaxy),
+        ("초록숲 협회", (x, y) => x < 0.25f ? Lime : Leaf(x, y) ? White : Forest),
+        ("붉은 등대 항구", Lighthouse),
+        ("시민 방위대", (x, y) => Shield(x, y) ? White : Mathf.FloorToInt(y * 5f) % 2 == 0 ? Navy : Orange),
+        ("얼음 왕관 왕국", Crown),
+        ("분홍 고양이 클럽", Cat),
+        ("번개 레이서 팀", (x, y) => Mathf.Abs(y - (0.5f + (Mathf.PingPong(x * 6f, 1f) - 0.5f) * 0.35f)) < 0.09f ? Gold : Black),
+        ("바다거북 섬", (x, y) => Turtle(x, y) ? Gold : y < 0.18f ? White : Turquoise),
     };
 
     static readonly Dictionary<string, Texture2D> cache = new Dictionary<string, Texture2D>();
@@ -66,12 +66,13 @@ public static class Flags
     }
 
     // ───── 도형 도우미 (좌표는 깃발 비율 3:2를 감안해 원이 찌그러지지 않게 x에 1.5를 곱함) ─────
-    static Color V3(float x, Color a, Color b, Color c) => x < 1f / 3f ? a : x < 2f / 3f ? b : c;
-    static Color H3(float y, Color top, Color mid, Color bottom) => y > 2f / 3f ? top : y > 1f / 3f ? mid : bottom;
     static bool Circle(float x, float y, float cx, float cy, float r) { float dx = (x - cx) * 1.5f, dy = y - cy; return dx * dx + dy * dy < r * r; }
-
-    static Color Nordic(float x, float y, Color field, Color cross)
-        => Mathf.Abs(x - 0.36f) < 0.07f || Mathf.Abs(y - 0.5f) < 0.1f ? cross : field;
+    static bool Ring(float x, float y, float cx, float cy, float r, float t) => Circle(x, y, cx, cy, r) && !Circle(x, y, cx, cy, r - t);
+    static bool Border(float x, float y, float t) => x < t / 1.5f || x > 1f - t / 1.5f || y < t || y > 1f - t;
+    static bool Band(float x, float y, float t) => Mathf.Abs((y - 0.5f) - (x - 0.5f) * 0.67f) < t * 1.2f;       // 왼쪽 아래 → 오른쪽 위 띠
+    static bool Saltire(float x, float y, float t) => Mathf.Abs((y - 0.5f) - (x - 0.5f) * 0.67f) < t || Mathf.Abs((y - 0.5f) + (x - 0.5f) * 0.67f) < t;
+    static bool Chevron(float x, float y, float depth) => x < depth * (1f - Mathf.Abs(y - 0.5f) * 2f);           // 깃대 쪽 삼각형
+    static bool Diamond(float x, float y, float cx, float cy, float r) => Mathf.Abs((x - cx) * 1.5f) + Mathf.Abs(y - cy) < r;
 
     // 꼭짓점이 위를 향한 별 (rot = 회전 각도)
     static bool Star(float x, float y, float cx, float cy, float r, float rot)
@@ -79,83 +80,140 @@ public static class Flags
         float dx = (x - cx) * 1.5f, dy = y - cy;
         float ang = Mathf.Atan2(dy, dx) * Mathf.Rad2Deg - 90f - rot, dist = Mathf.Sqrt(dx * dx + dy * dy);
         if (dist > r) return false;
-        // 각도에 따라 바깥 꼭짓점(r)과 안쪽 꼭짓점(0.38r) 사이 직선으로 이어진 테두리
         float seg = Mathf.Repeat(ang, 72f);
         float a = Mathf.Abs(seg - 36f) * Mathf.Deg2Rad;         // 0 = 안쪽 꼭짓점 방향, 36° = 바깥 꼭짓점
         Vector2 outer = new Vector2(Mathf.Cos(36f * Mathf.Deg2Rad), Mathf.Sin(36f * Mathf.Deg2Rad)) * r, inner = new Vector2(0.38f * r, 0f);
         Vector2 dir = new Vector2(Mathf.Cos(a), Mathf.Sin(a));
-        // 원점에서 dir 방향 광선이 inner→outer 선분과 만나는 거리
         Vector2 e = outer - inner;
         float denom = dir.x * e.y - dir.y * e.x;
         float edge = Mathf.Abs(denom) < 1e-6f ? r : (inner.x * e.y - inner.y * e.x) / denom;
         return dist < edge;
     }
 
-    static Color Usa(float x, float y)
+    // ───── 문양 ─────
+    // 가운데 둥근 해와 둘레로 뻗는 햇살
+    static Color Sun(float x, float y)
     {
-        if (x < 0.4f && y > 0.46f)
+        float dx = (x - 0.5f) * 1.5f, dy = y - 0.5f, d = Mathf.Sqrt(dx * dx + dy * dy);
+        if (d < 0.17f) return Gold;
+        float ang = Mathf.Atan2(dy, dx) * Mathf.Rad2Deg;
+        if (d < 0.32f && Mathf.Repeat(ang, 30f) < 11f) return Gold;
+        return Orange;
+    }
+
+    // 톱니바퀴: 톱니 달린 고리
+    static Color Gear(float x, float y)
+    {
+        float dx = (x - 0.5f) * 1.5f, dy = y - 0.5f, d = Mathf.Sqrt(dx * dx + dy * dy);
+        float ang = Mathf.Atan2(dy, dx) * Mathf.Rad2Deg;
+        float outer = Mathf.Repeat(ang, 40f) < 20f ? 0.3f : 0.25f;
+        if (d < outer && d > 0.12f) return Orange;
+        return Gray;
+    }
+
+    // 눈 덮인 봉우리 두 개와 작은 별
+    static Color Mountains(float x, float y)
+    {
+        float peak1 = 0.62f - Mathf.Abs(x - 0.35f) * 1.4f, peak2 = 0.5f - Mathf.Abs(x - 0.7f) * 1.3f;
+        float m = Mathf.Max(peak1, peak2);
+        if (y < m) return y > m - 0.08f ? White : Charcoal;
+        if (Star(x, y, 0.85f, 0.8f, 0.08f, 0f)) return White;
+        return Forest;
+    }
+
+    // 검은 바탕에 빨간 눈
+    static Color Eye(float x, float y)
+    {
+        float dx = (x - 0.5f) * 1.5f / 0.36f, dy = (y - 0.5f) / 0.19f;
+        if (dx * dx + dy * dy < 1f)
         {
-            float gx = (x / 0.4f) * 6f, gy = ((y - 0.46f) / 0.54f) * 5f;
-            float fx = gx - Mathf.Floor(gx) - 0.5f, fy = gy - Mathf.Floor(gy) - 0.5f;
-            return fx * fx + fy * fy < 0.07f ? White : Navy;
+            if (Circle(x, y, 0.5f, 0.5f, 0.12f)) return Circle(x, y, 0.5f, 0.5f, 0.05f) ? Black : Red;
+            return White;
         }
-        return Mathf.FloorToInt(y * 13f) % 2 == 0 ? Red : White;
+        return Black;
     }
 
-    static Color Greece(float x, float y)
+    // 짙은 남색 우주에 흩뿌린 별과 노란 고리 행성
+    static Color Galaxy(float x, float y)
     {
-        if (x < 0.37f && y > 0.44f)
-            return Mathf.Abs(x - 0.185f) < 0.04f || Mathf.Abs(y - 0.72f) < 0.06f ? White : Blue;
-        return Mathf.FloorToInt(y * 9f) % 2 == 0 ? Blue : White;
+        if (Circle(x, y, 0.62f, 0.5f, 0.13f)) return Gold;
+        float rx = (x - 0.62f) * 1.5f, ry = (y - 0.5f) * 3.2f + rx * 0.6f;
+        float rd = Mathf.Sqrt(rx * rx + ry * ry);
+        if (rd > 0.21f && rd < 0.25f) return Gold;
+        float h = Mathf.Sin(Mathf.Floor(x * 40f) * 12.9898f + Mathf.Floor(y * 27f) * 78.233f) * 43758.5453f;
+        if (h - Mathf.Floor(h) > 0.965f) return White;
+        return Space;
     }
 
-    static Color Brazil(float x, float y)
+    // 나뭇잎 (기울어진 타원 + 가운데 잎맥)
+    static bool Leaf(float x, float y)
     {
-        float dx = Mathf.Abs(x - 0.5f) / 0.42f, dy = Mathf.Abs(y - 0.5f) / 0.4f;
-        if (Circle(x, y, 0.5f, 0.5f, 0.2f)) return Mathf.Abs((y - 0.5f) + (x - 0.5f) * 0.3f) < 0.025f ? White : Navy;
-        return dx + dy < 1f ? Yellow : Green;
+        float px = (x - 0.62f) * 1.5f, py = y - 0.5f;
+        float c = 0.7f, s = 0.7f, u = px * c + py * s, v = -px * s + py * c;
+        bool inside = (u / 0.28f) * (u / 0.28f) + (v / 0.13f) * (v / 0.13f) < 1f;
+        return inside && Mathf.Abs(v) > 0.012f;
     }
 
-    // 태극기: 흰 바탕, 가운데 태극(위 빨강 · 아래 파랑, 비스듬히), 네 모서리에 검은 괘
-    static Color Korea(float x, float y)
+    // 빨간 바탕에 흰 등대와 노란 불빛
+    static Color Lighthouse(float x, float y)
     {
-        float px = (x - 0.5f) * 1.5f, py = y - 0.5f; // 가운데 원점, 가로세로 같은 비율
-        const float r = 0.25f;
-        // 태극: 왼쪽 위 → 오른쪽 아래로 기운 축
-        float ang = 33.7f * Mathf.Deg2Rad, c = Mathf.Cos(ang), s = Mathf.Sin(ang);
-        float u = px * c - py * s, v = px * s + py * c; // u: 축 방향(왼쪽 위 → 오른쪽 아래가 -/+)
-        if (u * u + v * v < r * r)
+        float cx = 0.5f, half = 0.07f - (y - 0.15f) * 0.05f;
+        if (y > 0.15f && y < 0.65f && Mathf.Abs(x - cx) < half) return Mathf.FloorToInt((y - 0.15f) * 10f) % 2 == 0 ? White : Black;
+        if (y >= 0.65f && y < 0.75f && Mathf.Abs(x - cx) < 0.05f) return Gold;
+        if (y >= 0.75f && y < 0.85f && Mathf.Abs(x - cx) < 0.06f * (0.85f - y) / 0.1f) return Black;
+        if (y >= 0.65f && y < 0.75f && Mathf.Abs(y - 0.7f) < (Mathf.Abs(x - cx) - 0.05f) * 0.25f + 0.01f && Mathf.Abs(x - cx) < 0.35f) return new Color(1f, 0.9f, 0.5f);
+        return y < 0.15f ? Navy : Red;
+    }
+
+    // 방패 모양 (위는 네모, 아래는 뾰족)
+    static bool Shield(float x, float y)
+    {
+        float dx = Mathf.Abs(x - 0.5f) * 1.5f;
+        if (y > 0.82f || y < 0.15f || dx > 0.22f) return false;
+        if (y > 0.45f) return true;
+        return dx < 0.22f * (y - 0.15f) / 0.3f;
+    }
+
+    // 하늘색 바탕에 흰 왕관
+    static Color Crown(float x, float y)
+    {
+        float dx = (x - 0.5f) * 1.5f;
+        if (Mathf.Abs(dx) < 0.3f && y > 0.28f && y < 0.4f) return White;               // 왕관 띠
+        if (Mathf.Abs(dx) < 0.3f && y >= 0.4f)
         {
-            float h = r * 0.5f;
-            if ((u + h) * (u + h) + v * v < h * h) return Red;   // 왼쪽 작은 원: 빨강
-            if ((u - h) * (u - h) + v * v < h * h) return Blue;  // 오른쪽 작은 원: 파랑
-            return v > 0f ? Red : Blue;
+            float k = Mathf.Repeat(dx + 0.3f, 0.15f) / 0.15f;                           // 뾰족한 봉우리 4개
+            float tip = 0.4f + (1f - Mathf.Abs(k - 0.5f) * 2f) * 0.25f;
+            if (y < tip) return White;
         }
-        // 괘: 대각선 위 중심에서 안쪽을 향해 3줄 (true = 끊긴 막대)
-        if (Trigram(px, py, -1, 1, false, false, false)) return Black; // 건 ☰ (왼쪽 위)
-        if (Trigram(px, py, 1, -1, true, true, true)) return Black;    // 곤 ☷ (오른쪽 아래)
-        if (Trigram(px, py, 1, 1, true, false, true)) return Black;    // 감 ☵ (오른쪽 위)
-        if (Trigram(px, py, -1, -1, false, true, false)) return Black; // 리 ☲ (왼쪽 아래)
-        return White;
+        return Ice;
     }
 
-    static bool Trigram(float px, float py, int sx, int sy, bool b0, bool b1, bool b2)
+    // 분홍 바탕에 흰 고양이 얼굴 (귀 두 개)
+    static Color Cat(float x, float y)
     {
-        Vector2 dir = new Vector2(sx * 1.5f, sy).normalized;   // 가운데 → 모서리 방향
-        Vector2 center = dir * 0.42f;
-        Vector2 d = new Vector2(px, py) - center;
-        float along = Vector2.Dot(d, dir), across = Vector2.Dot(d, new Vector2(-dir.y, dir.x));
-        const float barT = 0.028f, gap = 0.02f, len = 0.11f;
-        if (Mathf.Abs(across) > len) return false;
-        for (int k = 0; k < 3; k++)
+        if (Circle(x, y, 0.5f, 0.45f, 0.24f))
         {
-            float off = (k - 1) * (barT + gap);
-            if (Mathf.Abs(along - off) < barT * 0.5f)
-            {
-                bool broken = k == 0 ? b0 : k == 1 ? b1 : b2;
-                return !broken || Mathf.Abs(across) > 0.015f;
-            }
+            if (Circle(x, y, 0.42f, 0.5f, 0.035f) || Circle(x, y, 0.58f, 0.5f, 0.035f)) return Black;
+            return White;
         }
+        float dx = (x - 0.5f) * 1.5f;
+        for (int s = -1; s <= 1; s += 2)
+        {
+            float ex = dx - s * 0.15f;
+            if (y > 0.55f && y < 0.82f && Mathf.Abs(ex) < 0.1f * (0.82f - y) / 0.27f) return White;
+        }
+        return Pink;
+    }
+
+    // 바다거북: 둥근 등딱지와 네 다리, 머리
+    static bool Turtle(float x, float y)
+    {
+        float dx = (x - 0.5f) * 1.5f, dy = y - 0.55f;
+        if ((dx / 0.26f) * (dx / 0.26f) + (dy / 0.2f) * (dy / 0.2f) < 1f) return true;
+        if (Circle(x, y, 0.5f, 0.8f, 0.06f)) return true;
+        for (int sx = -1; sx <= 1; sx += 2)
+            for (int sy = -1; sy <= 1; sy += 2)
+                if (Circle(x, y, 0.5f + sx * 0.17f, 0.55f + sy * 0.16f, 0.06f)) return true;
         return false;
     }
 }

@@ -1,7 +1,8 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-// 국기 게양대: 도시 인도 모퉁이 곳곳에 굵고 긴 게양대를 세우고, 나라 국기를 무작위로 매달아 펄럭이게 함.
+// 깃발 게양대: 도시 인도 모퉁이 곳곳에 굵고 긴 게양대를 세우고, 가상의 단체·주 깃발(Flags)을 무작위로 매달아 펄럭이게 함.
+// 게양대 크기는 거인 크기에 비례 (거인이 커지면 게양대도 같이 커짐).
 // 거인이 지나가며 닿으면 오른손으로 뽑아 들고 무기로 씀: 들고 있는 동안 계속 좌우로 크게 휘두르고(자동),
 // 휘두르는 범위에 들어온 적(탱크·경찰·헬기·전투기)은 부서짐. 휘두르는 동작은 Human Melee Animations의
 // 한 손 공격(Attack1H01_R)을 애니메이터 상체 레이어(Swing)에서 반복 재생하고, 게양대는 오른손에 붙임.
@@ -12,7 +13,7 @@ public class Flagpoles : MonoBehaviour
     public static bool RightHandBusy => Instance && Instance.phase != Phase.None;
 
     [Header("배치")]
-    [Tooltip("도시에 세우는 게양대 수")] public int count = 26;
+    [Tooltip("도시에 세우는 게양대 수")] public int count = 20;
     [Tooltip("게양대 길이 = 거인 키 × 이 범위")] public Vector2 heightRatio = new Vector2(0.95f, 1.15f);
     [Tooltip("게양대 굵기(반지름) = 길이 × 이 비율")] public float thicknessRatio = 0.022f;
     [Tooltip("깃발 가로 길이 = 게양대 길이 × 이 비율 (세로는 가로의 2/3)")] public float flagSizeRatio = 0.45f;
@@ -53,6 +54,19 @@ public class Flagpoles : MonoBehaviour
 
     GiantHealth hp; GiantController ctrl; Animator anim;
     static Material poleMat, finialMat;
+    float buildH, appliedScale = 1f; // 게양대를 만들 때의 거인 키 · 지금 적용된 크기 배율
+
+    // 거인 크기에 비례: 만들 때보다 거인이 커진 만큼 게양대 전체(굵기·깃발 포함)를 키움
+    float PoleScale => buildH > 0f && hp ? hp.Height / buildH : 1f;
+    float Len(Pole p) => p.height * appliedScale; // 지금 크기의 게양대 길이
+
+    void ApplyScale()
+    {
+        float s = PoleScale;
+        if (Mathf.Abs(s - appliedScale) < 0.001f) return;
+        appliedScale = s;
+        foreach (var p in poles) if (p.root) p.root.transform.localScale = Vector3.one * s; // 아래 끝(땅) 기준으로 커짐
+    }
 
     void Awake() { Instance = this; }
     void OnDestroy() { if (Instance == this) Instance = null; }
@@ -66,6 +80,7 @@ public class Flagpoles : MonoBehaviour
         var giant = GiantHealth.Instance ? GiantHealth.Instance : FindObjectOfType<GiantHealth>();
         if (!city || !giant) return;
         float H = Mathf.Max(5f, giant.Height);
+        buildH = H; appliedScale = 1f;
         if (!poleMat) poleMat = new Material(Shader.Find("Standard")) { color = poleColor };
         if (!finialMat) finialMat = new Material(Shader.Find("Standard")) { color = finialColor };
 
@@ -198,6 +213,7 @@ public class Flagpoles : MonoBehaviour
         if (GameStartMenu.InMenu) return;
         Find();
         if (!hp || !anim) return;
+        ApplyScale();
         if (hp.IsDead || GiantShrink.Active || Paused)
         {
             if (phase == Phase.Reach) { phase = Phase.None; held = null; }
@@ -216,7 +232,7 @@ public class Flagpoles : MonoBehaviour
                 {
                     liftFromPos = held.root.transform.position; liftFromRot = held.root.transform.rotation;
                     phase = Phase.Lift; t = 0f;
-                    ItemFeed.Show($"국기 게양대 · {held.country}", held.tex, "계속 크게 휘둘러 닿는 적을 부숨", new Color(0.75f, 0.85f, 1f));
+                    ItemFeed.Show($"깃발 게양대 · {held.country}", held.tex, "계속 크게 휘둘러 닿는 적을 부숨", new Color(0.75f, 0.85f, 1f));
                 }
                 break;
             case Phase.Lift:
@@ -279,7 +295,7 @@ public class Flagpoles : MonoBehaviour
     {
         var root = held.root.transform;
         poles.Remove(held);
-        Vector3 snap = root.position + root.up * held.height * (gripAt + 0.06f); // 손 바로 위에서 꺾임
+        Vector3 snap = root.position + root.up * Len(held) * (gripAt + 0.06f); // 손 바로 위에서 꺾임
         CombatFX.Explosion(snap, Mathf.Max(5f, H * 0.2f));
         if (GiantCamera.Instance) GiantCamera.Instance.Shake(0.3f);
         // 게양대는 손에서 떨어져 나가 넘어지며 떨어짐 (충돌 없이 잠깐 떨어지다 사라짐)
@@ -289,7 +305,7 @@ public class Flagpoles : MonoBehaviour
         rb.velocity = hp.transform.forward * H * 0.4f + Vector3.up * H * 0.2f;
         rb.angularVelocity = hp.transform.right * 2.5f;
         Destroy(root.gameObject, 2.5f);
-        SupplyCrates.Notice($"국기 게양대({held.country})가 부러졌다!");
+        SupplyCrates.Notice($"깃발 게양대({held.country})가 부러졌다!");
         held = null; phase = Phase.None; t = 0f; hasPrev = false;
     }
 
@@ -310,7 +326,7 @@ public class Flagpoles : MonoBehaviour
     void PoleSegment(out Vector3 a, out Vector3 b)
     {
         var tr = held.root.transform;
-        a = tr.position; b = tr.position + tr.up * held.height;
+        a = tr.position; b = tr.position + tr.up * Len(held);
     }
 
     static float SegDist(Vector3 p, Vector3 a, Vector3 b)
@@ -435,7 +451,7 @@ public class Flagpoles : MonoBehaviour
         // 서 있는 게양대를 손 높이쯤에서 붙잡음
         float w = Paused ? 0f : Smooth(t);
         Vector3 bp = held.root.transform.position;
-        Vector3 hand = bp + Vector3.up * Mathf.Min(held.height * 0.5f, Shoulder.y - bp.y - armLen * 0.7f);
+        Vector3 hand = bp + Vector3.up * Mathf.Min(Len(held) * 0.5f, Shoulder.y - bp.y - armLen * 0.7f);
         Vector3 F = FlatDir(bp - hp.transform.position), R = Vector3.Cross(Vector3.up, F);
         float s = anim ? anim.transform.lossyScale.y : 1f;
         a.SetIKPositionWeight(AvatarIKGoal.RightHand, w);
@@ -488,7 +504,7 @@ public class Flagpoles : MonoBehaviour
         float handLen = mid ? (mid.position - handT.position).magnitude : armLen * 0.12f;
         Vector3 grip = palm - handT.up * handLen * 0.35f;
         Quaternion rot = Quaternion.LookRotation(axis * Vector3.right, dir);
-        Vector3 pos = grip - dir * held.height * gripAt;
+        Vector3 pos = grip - dir * Len(held) * gripAt;
         if (phase == Phase.Lift)
         {
             float k = Smooth(t);
