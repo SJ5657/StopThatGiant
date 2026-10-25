@@ -1103126,7 +1103126,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   supermanPrefab: {fileID: -1728013695380148634, guid: 2b9c5e3df9894dd4d9ca5b4080b68ab2, type: 3}
   animator: {fileID: 9100000, guid: 70d4dddc74c90454bbc1a4f990163b21, type: 2}
-  appearLevel: 18
+  appearLevel: 20
   firstDelay: 3
   respawnDelay: 180
   spawnDistanceRatio: 10

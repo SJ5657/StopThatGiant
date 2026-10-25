@@ -8,7 +8,7 @@ public class SupermanSpawner : MonoBehaviour
 
     [Tooltip("슈퍼맨 모델 (Assets/Models/SuperMan.vrm)")] public GameObject supermanPrefab;
     [Tooltip("떠 있을 때 애니메이션 (허리에 손 얹은 자세)")] public RuntimeAnimatorController animator;
-    [Tooltip("거인이 이 레벨이 되면 처음 등장")] public int appearLevel = 18;
+    [Tooltip("거인이 이 레벨이 되면 처음 등장")] public int appearLevel = 20;
     [Tooltip("등장 레벨이 된 뒤 실제로 나타나기까지(초)")] public float firstDelay = 3f;
     [Tooltip("날아가 버린 뒤 다시 등장까지(초)")] public float respawnDelay = 180f;
     [Tooltip("등장 위치: 거인에게서 이 거리(거인 키 배수)만큼 떨어진 하늘")] public float spawnDistanceRatio = 10f;
