@@ -1,6 +1,6 @@
 using UnityEngine;
 
-// 슈퍼맨 등장: 게임 시작 후 firstDelay초가 지나면 멀리서 날아옴. 한 번에 한 명.
+// 슈퍼맨 등장: 거인이 appearLevel 레벨이 되면 firstDelay초 뒤 멀리서 날아옴. 한 번에 한 명.
 // 마지막 돌진까지 모두 피해서 슈퍼맨이 날아가 버리면 respawnDelay초 뒤 다시 등장.
 public class SupermanSpawner : MonoBehaviour
 {
@@ -8,7 +8,8 @@ public class SupermanSpawner : MonoBehaviour
 
     [Tooltip("슈퍼맨 모델 (Assets/Models/SuperMan.vrm)")] public GameObject supermanPrefab;
     [Tooltip("떠 있을 때 애니메이션 (허리에 손 얹은 자세)")] public RuntimeAnimatorController animator;
-    [Tooltip("게임 시작 후 처음 등장까지(초) — 후반에 등장")] public float firstDelay = 300f;
+    [Tooltip("거인이 이 레벨이 되면 처음 등장")] public int appearLevel = 18;
+    [Tooltip("등장 레벨이 된 뒤 실제로 나타나기까지(초)")] public float firstDelay = 3f;
     [Tooltip("날아가 버린 뒤 다시 등장까지(초)")] public float respawnDelay = 180f;
     [Tooltip("등장 위치: 거인에게서 이 거리(거인 키 배수)만큼 떨어진 하늘")] public float spawnDistanceRatio = 10f;
 
@@ -21,7 +22,11 @@ public class SupermanSpawner : MonoBehaviour
         if (GameStartMenu.InMenu || !supermanPrefab) return;
         var g = GiantHealth.Instance;
         if (!g || g.IsDead || GiantShrink.Active) return;
-        if (nextAt < 0f) nextAt = Time.time + firstDelay;
+        if (nextAt < 0f)
+        {
+            if (!LevelSystem.Instance || LevelSystem.Instance.Level < appearLevel) return; // 후반(레벨 appearLevel)부터 등장
+            nextAt = Time.time + firstDelay;
+        }
         if (SupermanAI.Active || Time.time < nextAt || GiantHome.GiantSafe) return;
         Spawn(g);
     }
