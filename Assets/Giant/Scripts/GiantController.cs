@@ -18,6 +18,10 @@ public class GiantController : MonoBehaviour
     [HideInInspector] public bool inputLocked;
     // 0보다 크면 크기와 상관없이 이 속도(m/s, 달리기 기준)로 이동 (UFO 축소빔으로 작아졌을 때)
     [HideInInspector] public float speedOverride;
+    // speedOverride를 쓸 때 걷기(Shift) 속도. 0이면 speedOverride의 절반
+    [HideInInspector] public float walkSpeedOverride;
+    // 켜져 있으면 이 스크립트는 거인을 움직이지 않음 (중력 포함). 차에 치여 날아가는 동안 GiantShrink가 직접 움직임
+    [HideInInspector] public bool externalMotion;
     // 값이 있으면 입력을 무시하고 그 지점까지 스스로 달려감 (도착하면 null)
     [HideInInspector] public Vector3? autoMoveTarget;
 
@@ -175,10 +179,11 @@ public class GiantController : MonoBehaviour
         if (cc.isGrounded && verticalVel < 0) verticalVel = -1f * scale;
         verticalVel -= gravity * scale * Time.deltaTime;
 
-        float hSpeed = speedOverride > 0f ? (moving ? speedOverride * (IsRunning ? 1f : 0.5f) * input.magnitude : 0f) : speed * scale;
+        float hSpeed = speedOverride > 0f ? (moving ? (IsRunning ? speedOverride : walkSpeedOverride > 0f ? walkSpeedOverride : speedOverride * 0.5f) * input.magnitude : 0f) : speed * scale;
         Vector3 vel = (moving ? moveDir.normalized : Vector3.zero) * hSpeed;
         vel.y = verticalVel;
-        cc.Move(vel * Time.deltaTime);
+        if (externalMotion) { verticalVel = 0f; vel = Vector3.zero; } // 다른 스크립트가 직접 움직이는 중 (차에 치여 날아감): 중력·이동 적용 안 함
+        else cc.Move(vel * Time.deltaTime);
         Velocity = new Vector3(vel.x, 0, vel.z);
 
         if (areaHalfExtent.x > 0 && areaHalfExtent.y > 0 && !(GiantHome.Instance && GiantHome.Instance.Allows(transform.position))) // 거인의 집 마당은 도시 밖이어도 허용

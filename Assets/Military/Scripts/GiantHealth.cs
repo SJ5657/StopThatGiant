@@ -12,7 +12,7 @@ public class GiantHealth : MonoBehaviour
     [Tooltip("받는 피해 배율 (1 = 100%, 낮을수록 방어력 높음)")] public float damageTakenMultiplier = 1f;
     public float HP { get; private set; }
     // 무한모드(시작 화면 버튼) 또는 테스트 옵션이면 HP가 0이 되어도 죽지 않음
-    bool NoDeath => testNoDeath || GameStartMenu.InfiniteMode;
+    public bool NoDeath => testNoDeath || GameStartMenu.InfiniteMode;
     public bool IsDead => forcedDead || (HP <= 0f && !NoDeath);
     bool forcedDead;          // 즉사 (축소된 채 밟힘 등): 무한모드·테스트 옵션과 상관없이 게임 오버
     public string DeathReason { get; private set; }
@@ -143,8 +143,15 @@ public class GiantHealth : MonoBehaviour
     {
         if (IsDead) return;
         if (GiantHome.GiantSafe) return; // 거인의 집 안에서는 날아오던 공격도 피해 없음
-        if (GiantShrink.Active) return;  // 축소빔으로 작아진 동안은 군대 공격을 받지 않음 (대신 사람·차에 밟히면 즉사)
         dmg *= damageTakenMultiplier;
+        // UFO 레이저로 사람 크기가 된 동안: 사람 크기 HP가 원래 HP 대비 같은 비율만큼 깎임
+        if (GiantShrink.Active)
+        {
+            var s = GiantShrink.Instance;
+            s.TakeTinyDamage(dmg * s.tinyMaxHP / Mathf.Max(1f, maxHP));
+            if (shake && GiantCamera.Instance) GiantCamera.Instance.Shake(0.12f);
+            return;
+        }
         HP = Mathf.Max(0, HP - dmg);
         hitFlash = shake ? 0.25f : Mathf.Max(hitFlash, 0.08f);
         if (shake && GiantCamera.Instance) GiantCamera.Instance.Shake(0.12f);
@@ -176,14 +183,17 @@ public class GiantHealth : MonoBehaviour
         GUI.color = new Color(0, 0, 0, 0.6f);
         GUI.DrawTexture(new Rect(x - 1, y - 1, w + 2, h + 2), Texture2D.whiteTexture);
         bool tiny = GiantShrink.Active;
-        GUI.color = (hitFlash > 0 || (tiny && GiantShrink.TinyHitFlash)) ? new Color(1f, 0.9f, 0.9f) : new Color(0.9f, 0.2f, 0.25f);
+        GUI.color = hitFlash > 0 ? new Color(1f, 0.9f, 0.9f) : tiny ? new Color(0.75f, 0.35f, 1f) : new Color(0.9f, 0.2f, 0.25f);
         GUI.DrawTexture(new Rect(x, y, w * Mathf.Clamp01(ShownHP / ShownMaxHP), h), Texture2D.whiteTexture);
         GUI.color = Color.white;
     }
 
-    // 축소빔으로 작아진 동안은 소인 HP를 보여줌 (원래 HP는 그대로 보존)
-    float ShownHP => GiantShrink.Active ? GiantShrink.TinyHP : HP;
-    float ShownMaxHP => GiantShrink.Active ? Mathf.Max(1f, GiantShrink.TinyMaxHP) : maxHP;
+    // 맞았을 때 HP 바 깜빡임 (사람 크기 HP가 깎일 때 GiantShrink가 부름)
+    public void Flash() => hitFlash = Mathf.Max(hitFlash, 0.15f);
+
+    // 작아진 동안엔 사람 크기 HP를 보여줌
+    float ShownHP => GiantShrink.Active ? GiantShrink.Instance.TinyHP : HP;
+    float ShownMaxHP => GiantShrink.Active ? GiantShrink.Instance.tinyMaxHP : maxHP;
 
     void OnGUI()
     {
@@ -192,12 +202,11 @@ public class GiantHealth : MonoBehaviour
         float w = 260, h = 20, x = 20, y = 20;
         GUI.color = new Color(0, 0, 0, 0.6f);
         GUI.DrawTexture(new Rect(x - 3, y - 3, w + 6, h + 6), Texture2D.whiteTexture);
-        GUI.color = hitFlash > 0 ? new Color(1f, 0.9f, 0.9f) : healGlow > 0 ? Color.Lerp(new Color(0.9f, 0.2f, 0.25f), new Color(0.3f, 1f, 0.45f), 0.5f + 0.5f * Mathf.Sin(Time.time * 10f)) : new Color(0.9f, 0.2f, 0.25f);
-        if (GiantShrink.Active && GiantShrink.TinyHitFlash) GUI.color = new Color(1f, 0.9f, 0.9f);
+        GUI.color = hitFlash > 0 ? new Color(1f, 0.9f, 0.9f) : healGlow > 0 ? Color.Lerp(new Color(0.9f, 0.2f, 0.25f), new Color(0.3f, 1f, 0.45f), 0.5f + 0.5f * Mathf.Sin(Time.time * 10f)) : GiantShrink.Active ? new Color(0.75f, 0.35f, 1f) : new Color(0.9f, 0.2f, 0.25f);
         GUI.DrawTexture(new Rect(x, y, w * Mathf.Clamp01(ShownHP / ShownMaxHP), h), Texture2D.whiteTexture);
         GUI.color = Color.white;
         var style = new GUIStyle(GUI.skin.label) { fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
-        string label = GiantShrink.Active ? "소인 HP" : "GIANT HP";
+        string label = GiantShrink.Active ? "GIANT HP (사람 크기)" : "GIANT HP";
         GUI.Label(new Rect(x, y, w, h), $"{label}  {Mathf.CeilToInt(ShownHP)} / {ShownMaxHP:0}" + (GameStartMenu.InfiniteMode ? "  (무한모드)" : testNoDeath ? "  (TEST)" : ""), style);
         if (IsDead)
         {

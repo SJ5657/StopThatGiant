@@ -1,8 +1,9 @@
 using UnityEngine;
 
-// UFO: 게임 시작부터 거인 머리 위 높은 곳을 맴돌며 따라다니다가, 주기적으로 축소빔을 쏨.
-//  1) 경고: 거인 발밑에 보라색 원이 생기고 UFO에서 옅은 조준선이 내려옴 (앞 절반은 거인을 따라가고 뒤 절반은 그 자리에 고정)
-//  2) 발사: 빔이 내려꽂히고, 그때 거인이 원 안에 있으면 GiantShrink로 작아짐
+// UFO: 거인이 appearLevel(25)이 되면 나타나, 거인 머리 위 높은 곳을 맴돌며 땅에 레이저를 쏨 (fireDuration초 쏘고 cooldown초 쉼을 반복).
+//  - 레이저가 닿은 지점(보라색 원)은 거인을 향해 따라옴 (거인 달리기 속도보다 조금 느림)
+//  - 거인이 그 원 안에 들어가면 GiantShrink로 일반 사람 크기가 됨 → 15초 동안 적·사람·차가 공격해 옴
+//  - 맞히면 위로 날아가 사라졌다가 returnDelay(30초~2분) 중 무작위 시간 뒤 다시 나타남. 쏠 땐 거인 바로 근처부터 시작
 // UFO는 공격받지 않음 (충돌 박스 없음).
 public class UfoEnemy : MonoBehaviour
 {
@@ -15,21 +16,31 @@ public class UfoEnemy : MonoBehaviour
     [Tooltip("화면 위쪽에서 좌우로 오가는 속도")] public float orbitSpeed = 14f;
     [Tooltip("UFO 자체 회전 속도 (도/초)")] public float spinSpeed = 25f;
 
-    [Header("축소빔")]
-    [Tooltip("게임 시작 후 첫 발사까지(초)")] public float firstShotDelay = 0f;
-    [Tooltip("발사 간격(초)")] public float fireInterval = 25f;
-    [Tooltip("경고 시간(초): 이 동안 피하면 안 맞음")] public float warnTime = 2f;
-    [Tooltip("빔이 보이는 시간(초)")] public float beamTime = 0.6f;
-    [Tooltip("빔 반경 = 거인 키 × 이 비율")] public float beamRadiusRatio = 0.35f;
+    [Header("등장")]
+    [Tooltip("거인이 이 레벨이 되면 처음 등장")] public int appearLevel = 25;
+    [Tooltip("거인을 맞혀 작게 만든 뒤 사라졌다가 다시 나타나기까지 걸리는 시간(초) 범위 (최소, 최대)")] public Vector2 returnDelay = new Vector2(30f, 120f);
+    [Tooltip("사라질 때 위로 날아가 버리는 시간(초)")] public float departTime = 2f;
+
+    [Header("레이저")]
+    [Tooltip("UFO가 나타난 뒤 레이저를 쏘기 시작할 때까지(초)")] public float firstShotDelay = 8f;
+    [Tooltip("한 번에 레이저를 쏘는 시간(초). 그 안에 못 맞히면 쉼")] public float fireDuration = 10f;
+    [Tooltip("다 쏜 뒤 다시 쏘기까지 쉬는 시간(초)")] public float cooldown = 10f;
+    [Tooltip("레이저 지점이 거인을 따라오는 속도 = 거인 기본 이동(달리기) 속도 × 이 비율 (1보다 작으면 달려서 피할 수 있음)")] public float chaseSpeedRatio = 0.8f;
+    [Tooltip("레이저를 다시 쏠 때 거인에게서 떨어진 거리 = 거인 키 × 이 비율")] public float startDistanceRatio = 0.8f;
+    [Tooltip("레이저 원 반경 = 거인 키 × 이 비율")] public float beamRadiusRatio = 0.22f;
     public Color beamColor = new Color(0.75f, 0.35f, 1f, 1f);
 
-    enum State { Idle, Warn, Fire }
+    enum State { Idle, Firing }
     State state;
-    float stateT, nextShotAt, angle, swing, baseWidth = 12f, normalHeight = 25f;
+    float nextShotAt, angle, swing, baseWidth = 12f, normalHeight = 25f, firedFor;
+    bool present, departing;      // 하늘에 나와 있는지 / 맞힌 뒤 날아가 버리는 중
+    float returnAt = -1f, departAt; // returnAt < 0: 아직 등장 레벨이 안 됨
     Transform ufo;
     Vector3 target; float beamRadius;
-    GameObject ring, beam; Material mat;
-    Mesh ringMesh, beamMesh;
+    GameObject ring, glow, core; Material mat;
+    Mesh ringMesh, glowMesh, coreMesh;
+
+    public static bool Firing { get; private set; }
 
     void Start()
     {
@@ -45,11 +56,36 @@ public class UfoEnemy : MonoBehaviour
         if (g) { normalHeight = Mathf.Max(1f, g.Height); ufo.position = Desired(g, 0f); }
 
         mat = new Material(Shader.Find("Sprites/Default"));
-        ring = MakeObj("UfoWarnRing"); beam = MakeObj("UfoBeam");
-        beamMesh = WarningZone.Wall(Color.white, Color.white);
-        beam.GetComponent<MeshFilter>().sharedMesh = beamMesh;
-        ring.SetActive(false); beam.SetActive(false);
+        ring = MakeObj("UfoLaserRing"); glow = MakeObj("UfoLaserGlow"); core = MakeObj("UfoLaserCore");
+        glowMesh = WarningZone.Wall(Color.white, Color.white);
+        coreMesh = WarningZone.Wall(Color.white, Color.white);
+        glow.GetComponent<MeshFilter>().sharedMesh = glowMesh;
+        core.GetComponent<MeshFilter>().sharedMesh = coreMesh;
+        Show(false);
+        ufo.gameObject.SetActive(false); // 등장 레벨이 될 때까지 숨김
     }
+
+    // 나타남: 거인에게서 먼 하늘에서 날아와 자리를 잡고, 잠시 뒤 쏘기 시작
+    void Arrive(GiantHealth g)
+    {
+        present = true; departing = false; state = State.Idle;
+        normalHeight = Mathf.Max(1f, g.Height);
+        Vector3 gp = g.transform.position; gp.y = 0f;
+        float a = Random.Range(0f, Mathf.PI * 2f);
+        ufo.position = gp + new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a)) * normalHeight * 8f + Vector3.up * normalHeight * 4f;
+        ufo.gameObject.SetActive(true);
+        nextShotAt = Time.time + firstShotDelay;
+    }
+
+    // 거인을 맞힘: 위로 날아가 사라지고, returnDelay 범위의 무작위 시간 뒤 다시 나타남
+    void Depart()
+    {
+        state = State.Idle; Firing = false; Show(false);
+        departing = true; departAt = Time.time;
+        returnAt = Time.time + Random.Range(returnDelay.x, returnDelay.y);
+    }
+
+    void OnDisable() { Firing = false; }
 
     GameObject MakeObj(string n)
     {
@@ -59,6 +95,13 @@ public class UfoEnemy : MonoBehaviour
         var mr = go.AddComponent<MeshRenderer>(); mr.sharedMaterial = mat;
         mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; mr.receiveShadows = false;
         return go;
+    }
+
+    void Show(bool on)
+    {
+        if (ring) ring.SetActive(on);
+        if (glow) glow.SetActive(on);
+        if (core) core.SetActive(on);
     }
 
     // 거인 주변 궤도 위 목표 위치
@@ -71,91 +114,124 @@ public class UfoEnemy : MonoBehaviour
 
     Vector3 BeamOrigin => ufo ? ufo.position - Vector3.up * ufo.lossyScale.y * 2.5f : transform.position;
 
+    // 거인 기본 이동(달리기) 속도 (m/s). Shift를 누르면 걷기라 평소엔 이 속도로 움직임
+    float GiantSpeed()
+    {
+        var c = GiantController.Instance;
+        return c ? c.runSpeed * c.GameScale : normalHeight * 1.8f;
+    }
+
     void Update()
     {
         var g = GiantHealth.Instance;
-        if (!ufo || !g || GameStartMenu.InMenu) return;
+        if (!ufo || !g || GameStartMenu.InMenu) { Firing = false; return; }
         float dt = Time.deltaTime;
-        if (!GiantShrink.Active) normalHeight = Mathf.Max(1f, g.Height); // 작아진 동안엔 원래 키 기준 유지
+        bool shrunk = GiantShrink.Active;
 
-        // 크기·비행 (거인을 따라 궤도를 돎. 경고 중엔 천천히)
+        if (!present)
+        {
+            // 처음엔 거인이 appearLevel이 되면, 맞힌 뒤엔 정해 둔 시간이 지나면 다시 나타남 (작아져 있는 동안은 기다림)
+            Firing = false;
+            if (returnAt < 0f && LevelSystem.Instance && LevelSystem.Instance.Level >= appearLevel) returnAt = Time.time;
+            if (returnAt >= 0f && Time.time >= returnAt && !shrunk && !g.IsDead) Arrive(g);
+            return;
+        }
+        if (departing)
+        {
+            // 위로 빠르게 솟구치며 작아져 사라짐
+            Firing = false;
+            float k = (Time.time - departAt) / Mathf.Max(0.1f, departTime);
+            ufo.position += Vector3.up * normalHeight * 3f * dt * (1f + k * 3f);
+            ufo.localScale *= Mathf.Max(0f, 1f - dt * 1.2f);
+            ufo.Rotate(0f, spinSpeed * 6f * dt, 0f, Space.World);
+            if (k >= 1f) { departing = false; present = false; ufo.gameObject.SetActive(false); }
+            return;
+        }
+        if (!shrunk) normalHeight = Mathf.Max(1f, g.Height); // 작아진 동안엔 원래 키 기준 유지
+
+        // 크기·비행 (카메라 반대편 화면 위쪽에서 좌우로 오가며 거인을 따라감)
         float wantScale = normalHeight * sizeRatio / baseWidth;
         ufo.localScale = Vector3.one * Mathf.MoveTowards(ufo.localScale.x, wantScale, wantScale * dt);
-        // 카메라 반대편(화면 위쪽)에서만 좌우로 오가며 맴돎 → 카메라와 거인 사이를 가리지 않고 항상 화면에 보임
-        swing += orbitSpeed * (state == State.Idle ? 1f : 0.3f) * dt;
+        swing += orbitSpeed * (state == State.Idle ? 1f : 0.4f) * dt;
         var cam = Camera.main;
         Vector3 cf = cam ? cam.transform.forward : Vector3.forward; cf.y = 0f;
         float baseAngle = cf.sqrMagnitude > 0.001f ? Mathf.Atan2(cf.z, cf.x) * Mathf.Rad2Deg : 90f;
         angle = Mathf.MoveTowardsAngle(angle, baseAngle + Mathf.Sin(swing * Mathf.Deg2Rad) * 55f, 90f * dt);
-        float follow = Mathf.Max(40f, normalHeight * 2f); // 거인이 뛰어도 따라붙을 만큼 (거인 달리기 ≈ 키 × 1.5 m/s)
+        float follow = Mathf.Max(40f, normalHeight * 2f);
         Vector3 want = Desired(g, angle) + Vector3.up * Mathf.Sin(Time.time * 1.3f) * normalHeight * 0.05f;
         ufo.position = Vector3.MoveTowards(ufo.position, want, follow * dt);
         ufo.Rotate(0f, spinSpeed * dt, 0f, Space.World);
 
-        bool canFire = !GiantShrink.Active && !g.IsDead && !EnemyFreeze.Active && !(HostageEvent.Instance && HostageEvent.Instance.Busy);
+        bool canFire = !shrunk && !g.IsDead && !EnemyFreeze.Active && !GiantHome.GiantSafe
+                       && !(HostageEvent.Instance && HostageEvent.Instance.Busy);
+        Vector3 gp = g.transform.position; gp.y = 0f;
+
         switch (state)
         {
             case State.Idle:
-                if (Time.time < nextShotAt) break;
-                if (!canFire) { nextShotAt = Time.time + 2f; break; }
-                state = State.Warn; stateT = 0f;
-                beamRadius = normalHeight * beamRadiusRatio;
-                target = g.transform.position; target.y = 0f;
-                ring.SetActive(true); beam.SetActive(true);
+                Firing = false;
+                if (Time.time < nextShotAt || !canFire) break;
+                // 거인 바로 근처(UFO 쪽)에 쏘기 시작 → 곧장 피해야 함
+                Vector3 fromUfo = ufo.position - gp; fromUfo.y = 0f;
+                if (fromUfo.sqrMagnitude < 0.01f) fromUfo = Vector3.forward;
+                target = gp + fromUfo.normalized * normalHeight * startDistanceRatio;
+                state = State.Firing; firedFor = 0f;
+                Show(true);
                 break;
-            case State.Warn:
-                stateT += dt;
-                if (!canFire) { Cancel(); break; }
-                if (stateT < warnTime * 0.5f) { target = g.transform.position; target.y = 0f; } // 앞 절반은 따라오고 뒤 절반은 고정 → 피할 수 있음
-                float pulse = 0.5f + 0.5f * Mathf.Sin(stateT * 18f);
-                DrawRing(new Color(beamColor.r, beamColor.g, beamColor.b, 0.45f + 0.45f * pulse));
-                DrawBeam(beamRadius * 0.12f, new Color(beamColor.r, beamColor.g, beamColor.b, 0.25f));
-                if (stateT >= warnTime)
+
+            case State.Firing:
+                if (!canFire)
                 {
-                    state = State.Fire; stateT = 0f;
-                    Vector3 gp = g.transform.position; gp.y = 0f;
-                    bool hit = (gp - target).magnitude <= beamRadius && GiantShrink.TryBegin();
-                    nextShotAt = Time.time + fireInterval + (hit && GiantShrink.Instance ? GiantShrink.Instance.duration : 0f);
+                    // 보급상자 정지·인질 이벤트·집 안 등: 잠시 레이저를 끄고 그 자리에서 기다림
+                    Show(false); Firing = false;
+                    if (shrunk || g.IsDead) state = State.Idle;
+                    break;
                 }
-                break;
-            case State.Fire:
-                stateT += dt;
-                float fade = 1f - Mathf.Clamp01(stateT / beamTime);
-                DrawRing(new Color(beamColor.r, beamColor.g, beamColor.b, 0.8f * fade));
-                DrawBeam(beamRadius * Mathf.Lerp(0.6f, 1f, fade), new Color(beamColor.r, beamColor.g, beamColor.b, 0.75f * fade));
-                if (stateT >= beamTime) Cancel();
+                // 정해진 시간 동안 쏘면 멈추고 쉼
+                firedFor += dt;
+                if (firedFor >= fireDuration)
+                {
+                    state = State.Idle; Firing = false; Show(false);
+                    nextShotAt = Time.time + cooldown;
+                    break;
+                }
+                Show(true); Firing = true;
+                beamRadius = normalHeight * beamRadiusRatio;
+                // 레이저 지점이 거인을 느리게 따라옴
+                target = Vector3.MoveTowards(target, gp, GiantSpeed() * chaseSpeedRatio * dt);
+                float flicker = 0.85f + 0.15f * Mathf.Sin(Time.time * 37f);
+                DrawRing(new Color(beamColor.r, beamColor.g, beamColor.b, 0.55f + 0.3f * Mathf.Sin(Time.time * 9f)));
+                DrawBeam(glow, glowMesh, beamRadius * 0.55f * flicker, new Color(beamColor.r, beamColor.g, beamColor.b, 0.28f));
+                DrawBeam(core, coreMesh, beamRadius * 0.16f, new Color(1f, 0.85f, 1f, 0.9f));
+
+                // 거인 몸이 레이저 원에 닿으면 축소
+                float giantR = g.GetComponent<CharacterController>() ? g.GetComponent<CharacterController>().radius : 0f;
+                if ((gp - target).magnitude <= beamRadius + giantR * 0.5f && GiantShrink.TryBegin())
+                    Depart();
                 break;
         }
-    }
-
-    void Cancel()
-    {
-        state = State.Idle;
-        if (ring) ring.SetActive(false);
-        if (beam) beam.SetActive(false);
-        if (Time.time >= nextShotAt) nextShotAt = Time.time + 3f;
     }
 
     void DrawRing(Color c)
     {
         if (ringMesh) Destroy(ringMesh);
-        ringMesh = WarningZone.Annulus(0.88f, 1f, c, c);
+        ringMesh = WarningZone.Annulus(0.82f, 1f, c, c);
         ring.GetComponent<MeshFilter>().sharedMesh = ringMesh;
         ring.transform.position = target + Vector3.up * 0.3f;
         ring.transform.rotation = Quaternion.identity;
         ring.transform.localScale = Vector3.one * beamRadius;
     }
 
-    // UFO 밑에서 목표 지점까지 원기둥 빔 (Wall 메시: 반지름 1, 높이 0~1)
-    void DrawBeam(float radius, Color c)
+    // UFO 밑에서 목표 지점까지 원기둥 레이저 (Wall 메시: 반지름 1, 높이 0~1)
+    void DrawBeam(GameObject go, Mesh mesh, float radius, Color c)
     {
-        var cols = beamMesh.colors;
+        var cols = mesh.colors;
         for (int i = 0; i < cols.Length; i++) cols[i] = c;
-        beamMesh.colors = cols;
+        mesh.colors = cols;
         Vector3 top = BeamOrigin, bottom = target;
         Vector3 d = top - bottom;
-        beam.transform.position = bottom;
-        beam.transform.rotation = Quaternion.FromToRotation(Vector3.up, d.normalized);
-        beam.transform.localScale = new Vector3(radius, d.magnitude, radius);
+        go.transform.position = bottom;
+        go.transform.rotation = Quaternion.FromToRotation(Vector3.up, d.normalized);
+        go.transform.localScale = new Vector3(radius, d.magnitude, radius);
     }
 }

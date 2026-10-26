@@ -2,7 +2,7 @@ using UnityEngine;
 
 // 시민 한 명: 평소엔 블록 둘레의 인도를 따라 걷고(가끔 멈추거나 돌아섬), 거인이 가까이 오면 반대쪽으로 뛰어 도망.
 // 충분히 멀어지면 가장 가까운 인도로 돌아가 다시 걸음. 도망칠 땐 건물을 비켜 감. 거인 발밑에 깔리면 납작해졌다가 사라지고,
-// 거인 손에 잡히면(GiantEat) 버둥거림.
+// 거인 손에 잡히면(GiantEat) 버둥거림. UFO 레이저로 거인이 사람 크기가 된 동안엔 가까이 있던 시민이 달려들어 때림.
 public class Civilian : MonoBehaviour
 {
     enum State { Idle, Walk, Flee, Return, Squashed, Grabbed }
@@ -14,6 +14,7 @@ public class Civilian : MonoBehaviour
     int corner, dir;           // 다음에 향할 인도 모서리, 도는 방향(+1 반시계 / -1 시계)
     Vector3 returnTarget;
     float stateUntil, animSpeed, squashedAt, steerAngle;
+    bool attacking; float punchCooldown, punchHitTimer = -1f;   // 사람 크기가 된 거인을 공격하는 중
     static readonly int SpeedHash = Animator.StringToHash("Speed");
     // 막혔을 때 시도해 볼 방향 (정면 → 좌우로 점점 크게)
     static readonly float[] SteerAngles = { 0f, 30f, -30f, 60f, -60f, 90f, -90f, 135f, -135f };
@@ -50,6 +51,25 @@ public class Civilian : MonoBehaviour
         Vector3 toGiant = g ? g.transform.position - transform.position : Vector3.one * 9999f;
         toGiant.y = 0f;
         float gd = toGiant.magnitude;
+
+        // UFO 레이저로 거인이 사람 크기가 된 동안: 가까이 있던 시민은 도망 대신 달려들어 때림
+        var shrink = GiantShrink.Instance;
+        if (GiantShrink.Active && shrink && (attacking || gd < shrink.civilianJoinRadius))
+        {
+            attacking = true;
+            ShrinkAttacker.Step(transform, anim, mgr.runSpeed * mgr.scale * shrink.attackerSpeedRatio,
+                                ref punchCooldown, ref punchHitTimer, ref animSpeed);
+            return;
+        }
+        if (attacking)
+        {
+            // 끝나면 가장 가까운 인도로 돌아감
+            attacking = false; punchHitTimer = -1f;
+            Vector2Int b = mgr.BlockAt(transform.position);
+            returnTarget = mgr.NearestOnWalkway(b, transform.position, out int edge);
+            JoinWalkway(b, edge);
+            state = State.Return;
+        }
 
         // 거인 발밑에 깔림
         if (gd < mgr.squashRadius * gs) { Squash(); return; }
