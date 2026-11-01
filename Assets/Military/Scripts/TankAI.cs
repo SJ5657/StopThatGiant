@@ -25,6 +25,8 @@ public class TankAI : MonoBehaviour
 
     public bool IsDead { get; private set; }
     [Tooltip("체력 (방귀 가스 등 지속 피해용. 거인에게 밟히면 체력과 관계없이 즉사)")] public float maxHP = 60f;
+    [Tooltip("밟았을 때 점수 옆에 뜨는 이름")] public string scoreLabel = "TANK";
+    public event System.Action Fired; // 한 발 쏠 때마다 (투석기 팔 휘두르기 등)
     float hp = -1f;
 
     // 해산(거인이 집에 들어감): 사격을 멈추고 거인에게서 멀어지다가 화면 밖에서 사라짐
@@ -197,7 +199,7 @@ public class TankAI : MonoBehaviour
         if (IsDead) return;
         IsDead = true;
         enabled = false;
-        ScoreManager.Add(ScoreManager.Instance ? ScoreManager.Instance.tankPoints : 500, "TANK");
+        ScoreManager.Add(ScoreManager.Instance ? ScoreManager.Instance.tankPoints : 500, scoreLabel, transform.position + Vector3.up * 3f);
         CageSkill.Imprison(CageSkill.Kind.Soldier, CageSkill.TankCrew); // 승무원은 새장으로
         CombatFX.Explosion(transform.position + Vector3.up * 3f, 16f);
         CombatFX.Explosion(transform.position + Vector3.up * 1f, 10f);
@@ -208,7 +210,7 @@ public class TankAI : MonoBehaviour
             foreach (var m in r.materials) if (m.HasProperty("_Color")) m.color *= 0.3f;
         foreach (var c in GetComponentsInChildren<Collider>()) c.enabled = false;
         if (GiantCamera.Instance) GiantCamera.Instance.Shake(0.4f);
-        Destroy(gameObject, 8f);
+        SinkAway.Begin(gameObject, 3.5f); // 잔해는 잠시 뒤 땅속으로 가라앉아 사라짐
     }
 
     void Fire(GiantHealth g)
@@ -224,5 +226,6 @@ public class TankAI : MonoBehaviour
         Vector3 dir = (aim - origin).normalized;
         CombatFX.Muzzle(origin, dir, 3f);
         CombatFX.Spawn(CombatFX.Kind.Shell, origin, dir, shellSpeed, damage, 0f);
+        Fired?.Invoke();
     }
 }

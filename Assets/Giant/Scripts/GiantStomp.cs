@@ -90,6 +90,8 @@ public class GiantStomp : MonoBehaviour
             if (police) police.Crush();
             var trafficCar = hits[i] ? hits[i].GetComponentInParent<TrafficCar>() : null;
             if (trafficCar) trafficCar.Crush();
+            var creature = hits[i] ? hits[i].GetComponentInParent<WildCreature>() : null; // 중세 맵 마을 밖 동물·몬스터
+            if (creature) creature.Crush();
         }
     }
 

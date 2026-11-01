@@ -180,6 +180,7 @@ public class GiantController : MonoBehaviour
         verticalVel -= gravity * scale * Time.deltaTime;
 
         float hSpeed = speedOverride > 0f ? (moving ? (IsRunning ? speedOverride : walkSpeedOverride > 0f ? walkSpeedOverride : speedOverride * 0.5f) * input.magnitude : 0f) : speed * scale;
+        hSpeed *= GiantRopes.SpeedFactor; // 작살 줄에 묶이면 느려짐
         Vector3 vel = (moving ? moveDir.normalized : Vector3.zero) * hSpeed;
         vel.y = verticalVel;
         if (externalMotion) { verticalVel = 0f; vel = Vector3.zero; } // 다른 스크립트가 직접 움직이는 중 (차에 치여 날아감): 중력·이동 적용 안 함
@@ -209,7 +210,7 @@ public class GiantController : MonoBehaviour
         {
             anim.SetFloat(SpeedHash, animSpeed);
             // 지친 상태로 걸을 때는 걷기 애니메이션도 느리게 재생 (발 미끄러짐 방지 + 지친 느낌)
-            anim.speed = (moving && !IsRunning) ? mult : (IsRunning && boosted ? boostRunMultiplier : 1f);
+            anim.speed = ((moving && !IsRunning) ? mult : (IsRunning && boosted ? boostRunMultiplier : 1f)) * (moving ? GiantRopes.SpeedFactor : 1f);
         }
     }
 }

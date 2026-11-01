@@ -21,13 +21,30 @@ public class TallBuildings : MonoBehaviour
 
     [Header("부술 수 있는 높이")]
     [Tooltip("거인 키의 이 비율 미만인 빌딩만 부술 수 있음 (0.5 = 거인 키의 50%)")] [Range(0.1f, 1f)] public float breakableHeightRatio = 0.5f;
+    [Tooltip("높이를 지붕·첨탑·성가퀴까지 포함한 전체 높이로 잼 (중세: 지붕이 높아 상자 높이만으로는 거인보다 커 보여도 부서졌음)")] public bool measureWithRoof = false;
     [Tooltip("부술 수 없는 빌딩이 있는 레이어 (거인이 통과하지 못하는 레이어)")] public string solidLayerName = "Default";
     public float recheckInterval = 0.25f;
 
     int buildingLayer, solidLayer;
     GiantHealth giant;
     readonly List<Transform> solid = new List<Transform>(); // 지금 부술 수 없는 빌딩
+    readonly Dictionary<Transform, float> heightOf = new Dictionary<Transform, float>(); // 비교에 쓰는 건물 높이 (measureWithRoof면 지붕 포함)
     float nextCheckAt, lastThreshold;
+
+    float Height(Transform b) => heightOf.TryGetValue(b, out var h) ? h : b.lossyScale.y;
+
+    // 건물 본체의 높이 (measureWithRoof면 지붕 포함). 맞아서 기울거나 꺼져도 처음 잰 값
+    public static float MeasuredHeight(Transform b) => Instance ? Instance.Height(b) : b.lossyScale.y;
+
+    // 지붕 포함 전체 높이 = 렌더러들 윗면 − 상자 바닥
+    static float FullHeight(Transform b)
+    {
+        var rs = b.GetComponentsInChildren<Renderer>();
+        if (rs.Length == 0) return b.lossyScale.y;
+        float top = rs[0].bounds.max.y;
+        foreach (var r in rs) top = Mathf.Max(top, r.bounds.max.y);
+        return Mathf.Max(b.lossyScale.y, top - (b.position.y - b.lossyScale.y * 0.5f));
+    }
 
     public static TallBuildings Instance { get; private set; }
     void Awake() { Instance = this; }
@@ -46,6 +63,7 @@ public class TallBuildings : MonoBehaviour
     {
         if (!b) return;
         solid.Remove(b);
+        heightOf.Remove(b);
         SetLayer(b, buildingLayer);
         BuildingDestruction.Break(b.gameObject, hitPoint, push);
     }
@@ -83,9 +101,10 @@ public class TallBuildings : MonoBehaviour
             tall++;
         }
 
+        if (measureWithRoof) foreach (var b in roots) heightOf[b] = FullHeight(b);
         lastThreshold = giantHeight * breakableHeightRatio;
         foreach (var b in roots)
-            if (b.lossyScale.y >= lastThreshold) { SetLayer(b, solidLayer); solid.Add(b); }
+            if (Height(b) >= lastThreshold) { SetLayer(b, solidLayer); solid.Add(b); }
         Debug.Log($"[TallBuildings] 초고층 {tall}채 · 부술 수 없는 빌딩 {solid.Count}채 (거인 키 {giantHeight:0}m, 기준 {lastThreshold:0}m, 리스폰 {spawn})");
     }
 
@@ -124,7 +143,7 @@ public class TallBuildings : MonoBehaviour
         {
             var b = solid[i];
             if (!b) { solid.RemoveAt(i); continue; }
-            if (b.lossyScale.y < threshold) { SetLayer(b, buildingLayer); solid.RemoveAt(i); }
+            if (Height(b) < threshold) { SetLayer(b, buildingLayer); solid.RemoveAt(i); }
         }
     }
 }

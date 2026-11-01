@@ -8,4 +8,7 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/City.unity
     guid: 9fc0d4010bbf28b4594072e72b8655ab
+  - enabled: 1
+    path: Assets/Scenes/Medieval.unity
+    guid: 8d9dc716f0a227149b9e2ff18a4bdbbb
   m_configObjects: {}

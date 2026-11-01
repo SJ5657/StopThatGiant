@@ -177,7 +177,8 @@ public class Civilian : MonoBehaviour
         state = State.Squashed;
         squashedAt = Time.time;
         BloodSplat.Spawn(transform.position, mgr.scale);
-        if (mgr.stompScore > 0) ScoreManager.Add(mgr.stompScore, "밟기!");
+        if (mgr.stompScore > 0) ScoreManager.Add(mgr.stompScore, "밟기!", transform.position + Vector3.up);
+        else ScoreManager.Add(3, null, transform.position + Vector3.up); // 점수가 없어도 경험치는 조금
         if (anim) anim.enabled = false;
         var s = transform.localScale;
         transform.localScale = new Vector3(s.x * 1.4f, s.y * 0.12f, s.z * 1.4f);

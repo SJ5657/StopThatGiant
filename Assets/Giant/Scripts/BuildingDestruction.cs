@@ -176,7 +176,7 @@ public class BuildingDestruction : MonoBehaviour
 
         // 거인 키 대비 작은 건물(oneHitHeightRatio 미만)은 한 번에 무너짐
         var giant = GiantHealth.Instance;
-        if (giant && giant.Height > 1f && t.lossyScale.y < giant.Height * Instance.oneHitHeightRatio) { Break(t.gameObject, hitPoint, push); return; }
+        if (giant && giant.Height > 1f && TallBuildings.MeasuredHeight(t) < giant.Height * Instance.oneHitHeightRatio) { Break(t.gameObject, hitPoint, push); return; } // 중세 집은 상자가 3.6m라도 지붕까지 9m 남짓
 
         var hp = t.GetComponent<BuildingHealth>();
         if (!hp)
@@ -222,7 +222,8 @@ public class BuildingDestruction : MonoBehaviour
         if (countIt)
         {
             DestroyedCount++;
-            ScoreManager.Add(ScoreManager.Instance ? ScoreManager.Instance.buildingPoints : 100);
+            var col = b.GetComponent<Collider>();
+            ScoreManager.Add(ScoreManager.Instance ? ScoreManager.Instance.buildingPoints : 100, null, col ? col.bounds.center : b.transform.position); // 경험치는 구슬로 거인에게 흡수
             Money.AddForBuilding(); // 건물을 부수면 돈 (상점에서 사용)
             ItemDrops.OnBuildingBroken(new Vector3(b.transform.position.x, 0f, b.transform.position.z)); // 확률로 보급상자·인질 차량·깔린 사람·감자가방 중 하나만
         }

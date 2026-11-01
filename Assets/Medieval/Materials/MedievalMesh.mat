@@ -1,0 +1,37 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: MedievalMesh
+  m_Shader: {fileID: 4800000, guid: 2b31ca1c5dc558b4aaec991f410282cb, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 1
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs: []
+    m_Ints: []
+    m_Floats:
+    - _LineWidth: 0.45
+    - _MinLinePixels: 1.2
+    - _Shade: 0.3
+    - _TileRow: 0.9
+    - _Tiles: 0
+    m_Colors:
+    - _Color: {r: 0.95, g: 0.95, b: 0.95, a: 1}
+    - _LineColor: {r: 0.11999995, g: 0.11999995, b: 0.14999998, a: 1}
+    - _ShadowColor: {r: 0.62, g: 0.65999997, b: 0.78, a: 1}
+  m_BuildTextureStacks: []

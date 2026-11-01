@@ -23,6 +23,8 @@ public class HeliAI : MonoBehaviour
     [Tooltip("거인에게 이보다 가까워지면 바깥으로 급히 벗어남")] public float panicRadius = 90f;
 
     [Header("사격")]
+    [Tooltip("쏘는 것 (Rocket = 헬기 로켓, Javelin = 그리폰 기사의 창, Fireball = 와이번 불덩이)")] public CombatFX.Kind projectile = CombatFX.Kind.Rocket;
+    [Tooltip("격추했을 때 점수 옆에 뜨는 이름")] public string scoreLabel = "HELICOPTER";
     public float fireInterval = 3.2f;
     public float rocketSpeed = 80f;
     public float damage = 40f;
@@ -157,7 +159,7 @@ public class HeliAI : MonoBehaviour
     {
         if (IsDead) return;
         IsDead = true;
-        ScoreManager.Add(ScoreManager.Instance ? ScoreManager.Instance.heliPoints : 800, "HELICOPTER");
+        ScoreManager.Add(ScoreManager.Instance ? ScoreManager.Instance.heliPoints : 800, scoreLabel, transform.position);
         CageSkill.Imprison(CageSkill.Kind.Soldier, CageSkill.HeliCrew); // 승무원은 새장으로
         CombatFX.Explosion(transform.position, 24f);
         CombatFX.Explosion(transform.position + Random.insideUnitSphere * 6f, 14f);
@@ -175,9 +177,10 @@ public class HeliAI : MonoBehaviour
         transform.position += vel * dt;
         transform.Rotate(fallSpin * dt, Space.World);
         if (Random.value < 0.3f) CombatFX.Explosion(transform.position, 5f);
-        if (transform.position.y <= 1f)
+        float ground = WildTerrain.Active ? WildTerrain.Height(transform.position.x, transform.position.z) : 0f; // 중세 맵 언덕
+        if (transform.position.y <= ground + 1f)
         {
-            CombatFX.Explosion(new Vector3(transform.position.x, 2f, transform.position.z), 20f);
+            CombatFX.Explosion(new Vector3(transform.position.x, ground + 2f, transform.position.z), 20f);
             Destroy(gameObject);
         }
     }
@@ -193,6 +196,6 @@ public class HeliAI : MonoBehaviour
         if (smoke) aim += Random.insideUnitSphere * g.Scale * 1.5f;
         Vector3 dir = (aim - origin).normalized;
         CombatFX.Muzzle(origin, dir, 2f);
-        CombatFX.Spawn(CombatFX.Kind.Rocket, origin, dir, rocketSpeed, damage, smoke ? 0f : homing);
+        CombatFX.Spawn(projectile, origin, dir, rocketSpeed, damage, smoke ? 0f : homing);
     }
 }

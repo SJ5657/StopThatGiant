@@ -1,6 +1,7 @@
 using UnityEngine;
 
 // 게임 시작 화면 → 성별(거인 모델) 선택 → 게임 시작.
+// 시작 화면의 맵 선택(현대 도시 / 중세 마을)에서 다른 맵을 누르면 그 맵의 씬을 불러와 시작 화면부터 (고른 맵은 다음 실행 때도 유지).
 // 메뉴 동안에는 게임을 멈추고(Time.timeScale = 0) 게임 HUD를 숨기며, 배경에 거인을 보여주면서 카메라가 천천히 흔들린다.
 // 성별 카드에 마우스를 올리면 배경의 거인이 그 모델로 바뀌어 미리보기됨. 성별을 고른 뒤에만 '게임 시작'이 활성화.
 // 시작 화면: 게임 시작(HP 0이면 패배) / 무한모드(HP 0이 되어도 죽지 않음) / 게임 종료.
@@ -31,6 +32,20 @@ public class GameStartMenu : MonoBehaviour
     [Header("타이틀")]
     public string gameTitle = "Stop That Giant";
     public string subtitle = "도시를 짓밟고, 몰려드는 군대를 물리쳐라!";
+
+    [System.Serializable]
+    public class MapOption
+    {
+        public string label;
+        [Tooltip("빌드 설정에 들어 있는 씬 이름")] public string scene;
+        public Color color = Color.white;
+    }
+    [Header("맵 (시작 화면에서 선택)")]
+    public MapOption[] maps =
+    {
+        new MapOption { label = "현대 도시", scene = "City", color = new Color(0.30f, 0.55f, 0.95f) },
+        new MapOption { label = "중세 마을", scene = "Medieval", color = new Color(0.80f, 0.55f, 0.25f) },
+    };
 
     [Header("시작 화면 카메라 (거인 키 기준 비율) — 발목 아래만 보이게")]
     public float titleCameraHeight = 0.02f;
@@ -66,7 +81,31 @@ public class GameStartMenu : MonoBehaviour
     }
     bool settingsOpen;
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-    static void ResetStatics() { lastChoice = -1; lastInfinite = false; InfiniteMode = false; }
+    static void ResetStatics() { lastChoice = -1; lastInfinite = false; InfiniteMode = false; bootChecked = false; }
+
+    // ───── 맵 ─────
+    const string MapPref = "Map";
+    static bool bootChecked;   // 게임을 처음 켰을 때 한 번: 지난번에 고른 맵으로
+    string pendingMap;         // 누른 맵 (화면에 '불러오는 중'을 한 번 그린 뒤 불러옴)
+    int pendingMapFrame;
+
+    int CurrentMap
+    {
+        get
+        {
+            string name = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+            for (int i = 0; i < maps.Length; i++) if (maps[i].scene == name) return i;
+            return -1;
+        }
+    }
+
+    void LoadMap(int i)
+    {
+        if (i < 0 || i >= maps.Length || i == CurrentMap || pendingMap != null) return;
+        if (!Application.CanStreamedLevelBeLoaded(maps[i].scene)) { Debug.LogWarning($"[GameStartMenu] 빌드 설정에 없는 씬: {maps[i].scene}"); return; }
+        PlayerPrefs.SetString(MapPref, maps[i].scene); PlayerPrefs.Save();
+        pendingMap = maps[i].scene; pendingMapFrame = Time.frameCount;
+    }
 
     float referenceScale = 1f; // 첫 번째(여자) 모델 크기 = 게임 기준 크기
 
@@ -78,6 +117,19 @@ public class GameStartMenu : MonoBehaviour
     void Awake()
     {
         if (!Application.isPlaying) return; // 편집 모드: 미리보기만
+#if !UNITY_EDITOR
+        // 게임을 켰을 때: 지난번에 고른 맵이 첫 씬과 다르면 그 맵으로 (편집기에선 지금 연 씬 그대로)
+        if (!bootChecked)
+        {
+            bootChecked = true;
+            string want = PlayerPrefs.GetString(MapPref, "");
+            if (!string.IsNullOrEmpty(want) && want != UnityEngine.SceneManagement.SceneManager.GetActiveScene().name && Application.CanStreamedLevelBeLoaded(want))
+            {
+                UnityEngine.SceneManagement.SceneManager.LoadScene(want);
+                return;
+            }
+        }
+#endif
         Instance = this;
         if (!giant) giant = FindObjectOfType<GiantController>();
         if (!giantCamera) giantCamera = FindObjectOfType<GiantCamera>();
@@ -232,6 +284,12 @@ public class GameStartMenu : MonoBehaviour
         if (!InMenu) { UpdatePause(); return; }
         Cursor.lockState = CursorLockMode.None; Cursor.visible = true;
         if (Time.timeScale != 0f) Time.timeScale = 0f;
+        // 맵 불러오기: '불러오는 중'이 화면에 한 번 그려진 뒤 (중세 마을은 불러오며 건물을 세우느라 잠깐 멈춤)
+        if (pendingMap != null)
+        {
+            if (Time.frameCount - pendingMapFrame >= 2) UnityEngine.SceneManagement.SceneManager.LoadScene(pendingMap);
+            return;
+        }
         if (Time.unscaledTime - stateAt < 0.2f) return;
 
         if (state == State.Title && settingsOpen)
@@ -241,6 +299,7 @@ public class GameStartMenu : MonoBehaviour
         else if (state == State.Title)
         {
             if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter) || Input.GetKeyDown(KeyCode.Space)) { pendingInfinite = false; GoSelect(); }
+            else if (Input.GetKeyDown(KeyCode.Tab) && maps.Length > 1) LoadMap((CurrentMap + 1) % maps.Length); // Tab: 다음 맵
         }
         else if (state == State.Select)
         {
@@ -368,14 +427,51 @@ public class GameStartMenu : MonoBehaviour
 
         float bw = Mathf.Clamp(W * 0.22f, 240f, 340f), bh = Mathf.Clamp(H * 0.075f, 48f, 72f);
         float y = H * 0.45f;
+        if (pendingMap != null) { DrawLoading(W, H); return; }
         if (settingsOpen) { DrawSettings(W, H, fade); return; }
+        DrawMaps(x, H * 0.375f, bw, Mathf.Clamp(H * 0.045f, 34f, 48f), fade);
         if (MenuButton(new Rect(x, y, bw, bh), "게임 시작", new Color(1f, 0.55f, 0.15f), true, fade)) { pendingInfinite = false; GoSelect(); return; }
         if (MenuButton(new Rect(x, y + bh * 1.3f, bw, bh), "무한모드", new Color(0.55f, 0.4f, 1f), true, fade)) { pendingInfinite = true; GoSelect(); return; }
         if (MenuButton(new Rect(x, y + bh * 2.6f, bw, bh), "설정", new Color(0.25f, 0.62f, 0.55f), true, fade)) { settingsOpen = true; return; }
         if (MenuButton(new Rect(x, y + bh * 3.9f, bw, bh), "게임 종료", new Color(0.42f, 0.45f, 0.52f), true, fade)) { Quit(); return; }
 
-        ShadowLabel(new Rect(x, H - 50, W * 0.5f, 30), "Enter : 게임 시작",
+        ShadowLabel(new Rect(x, H - 50, W * 0.5f, 30), maps.Length > 1 ? "Enter : 게임 시작   ·   Tab : 맵 바꾸기" : "Enter : 게임 시작",
             Style(14, FontStyle.Normal, TextAnchor.MiddleLeft), new Color(1, 1, 1, 0.6f * fade));
+    }
+
+    // 맵 선택 줄: 지금 맵은 밝게 채우고 테두리, 다른 맵은 어둡게. 다른 맵을 누르면 그 맵을 불러옴
+    void DrawMaps(float x, float y, float width, float h, float fade)
+    {
+        if (maps == null || maps.Length < 2) return;
+        int cur = CurrentMap;
+        const float gap = 10f;
+        float w = (width - gap * (maps.Length - 1)) / maps.Length;
+        var e = Event.current;
+        for (int i = 0; i < maps.Length; i++)
+        {
+            var r = new Rect(x + i * (w + gap), y, w, h);
+            bool sel = i == cur, hov = !sel && r.Contains(e.mousePosition);
+            Color c = maps[i].color;
+            Box(new Rect(r.x - 2, r.y - 2, r.width + 4, r.height + 4), sel ? new Color(1f, 1f, 1f, 0.9f * fade) : new Color(0f, 0f, 0f, 0.6f * fade));
+            Box(r, sel ? new Color(c.r, c.g, c.b, 0.95f * fade) : new Color(c.r * 0.35f, c.g * 0.35f, c.b * 0.35f, (hov ? 0.95f : 0.8f) * fade));
+            ShadowLabel(r, maps[i].label, Style(Mathf.RoundToInt(h * 0.42f), FontStyle.Bold, TextAnchor.MiddleCenter),
+                new Color(1f, 1f, 1f, (sel ? 1f : hov ? 0.95f : 0.6f) * fade));
+            if (!sel && e.type == EventType.MouseDown && e.button == 0 && r.Contains(e.mousePosition)
+                && Time.unscaledTime - stateAt > 0.2f && Application.isPlaying)
+            {
+                e.Use();
+                LoadMap(i);
+            }
+        }
+    }
+
+    void DrawLoading(float W, float H)
+    {
+        Box(new Rect(0, 0, W, H), new Color(0f, 0f, 0f, 0.55f));
+        string name = "";
+        foreach (var m in maps) if (m.scene == pendingMap) name = m.label;
+        ShadowLabel(new Rect(0, H * 0.45f, W, H * 0.1f), $"{name} 불러오는 중...",
+            Style(Mathf.RoundToInt(H * 0.045f), FontStyle.Bold, TextAnchor.MiddleCenter), new Color(1f, 0.82f, 0.28f, 1f));
     }
 
     // 설정 창: 가운데 패널 + 체크박스 목록 + 닫기

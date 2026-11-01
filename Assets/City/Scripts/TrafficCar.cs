@@ -303,13 +303,13 @@ public class TrafficCar : MonoBehaviour
         if (IsDead) return;
         IsDead = true;
         enabled = false;
-        ScoreManager.Add(50, "CAR");
+        ScoreManager.Add(50, "CAR", transform.position + Vector3.up * 2f);
         CombatFX.Explosion(transform.position + Vector3.up * 2f, 8f);
         Vector3 sc = transform.localScale;
         transform.localScale = new Vector3(sc.x * 1.15f, sc.y * 0.2f, sc.z * 1.1f);
         foreach (var r in GetComponentsInChildren<Renderer>())
             foreach (var m in r.materials) if (m.HasProperty("_Color")) m.color *= 0.35f;
         foreach (var c in GetComponentsInChildren<Collider>()) c.enabled = false;
-        Destroy(gameObject, 6f);
+        SinkAway.Begin(gameObject, 3f); // 잔해는 잠시 뒤 땅속으로 가라앉아 사라짐
     }
 }

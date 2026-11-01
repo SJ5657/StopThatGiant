@@ -753570,6 +753570,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d027480414b171549b9ea47454b4cf59, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  generateAtRuntime: 0
   blocksX: 30
   blocksZ: 30
   blockSize: 80
@@ -753844,6 +753845,28 @@ MonoBehaviour:
   sidewalkMat: {fileID: 2100000, guid: e5a949f1fce564344b5760dba84865bf, type: 2}
   parkMat: {fileID: 2100000, guid: cf453c6784bc8884584d21b312c81275, type: 2}
   groundMat: {fileID: 2100000, guid: 20d63e4ee3fd41f40870653dfe5198e8, type: 2}
+  style: 0
+  timberMat: {fileID: 0}
+  plasterMat: {fileID: 0}
+  stoneMat: {fileID: 0}
+  woodMat: {fileID: 0}
+  roofMat: {fileID: 0}
+  meshMat: {fileID: 0}
+  plazaMat: {fileID: 0}
+  medMinLot: 18
+  medMaxLot: 34
+  medSetback: 0.6
+  floorHeight: 3.6
+  gardenChance: 0.5
+  medOutskirts: 285
+  outskirtLotScale: 0.6
+  medTowerChance: 0.07
+  medTowerFlatChance: 0.75
+  parishChurches: 6
+  cityWall: 1
+  fieldMat: {fileID: 0}
+  fieldMargin: 5000
+  gateRoads: 1
 --- !u!4 &1316342898
 Transform:
   m_ObjectHideFlags: 0
@@ -753880,6 +753903,7 @@ MonoBehaviour:
   seed: 777
   heightBoost: 1.15
   breakableHeightRatio: 0.5
+  measureWithRoof: 0
   solidLayerName: Default
   recheckInterval: 0.25
 --- !u!114 &1316342900
@@ -831282,6 +831306,8 @@ MonoBehaviour:
   shellMaterial: {fileID: 2100000, guid: d63314b1211cafb43afe30f151d96e12, type: 2}
   rocketMaterial: {fileID: 2100000, guid: 09ebad48eee0c2549a54c650b673d04c, type: 2}
   warningMaterial: {fileID: 2100000, guid: d3493a881d2872c43bc7ffe901fdc12c, type: 2}
+  boulderMaterial: {fileID: 0}
+  javelinMaterial: {fileID: 0}
 --- !u!4 &1451170185
 Transform:
   m_ObjectHideFlags: 0
@@ -880657,6 +880683,13 @@ MonoBehaviour:
   gameTitle: Stop That Giant
   subtitle: "\uB3C4\uC2DC\uB97C \uC9D3\uBC1F\uACE0, \uBAB0\uB824\uB4DC\uB294 \uAD70\uB300\uB97C
     \uBB3C\uB9AC\uCCD0\uB77C!"
+  maps:
+  - label: "\uD604\uB300 \uB3C4\uC2DC"
+    scene: City
+    color: {r: 0.3, g: 0.55, b: 0.95, a: 1}
+  - label: "\uC911\uC138 \uB9C8\uC744"
+    scene: Medieval
+    color: {r: 0.8, g: 0.55, b: 0.25, a: 1}
   titleCameraHeight: 0.02
   titleCameraDistance: 0.28
   titleFocusHeight: 0.05
@@ -929764,6 +929797,8 @@ GameObject:
   m_Component:
   - component: {fileID: 1620364645}
   - component: {fileID: 1620364646}
+  - component: {fileID: 1620364647}
+  - component: {fileID: 1620364648}
   m_Layer: 0
   m_Name: Military
   m_TagString: Untagged
@@ -929835,6 +929870,65 @@ MonoBehaviour:
   spawnInterval: 1.5
   jetSpawnDistance: 1300
   showBanners: 0
+--- !u!114 &1620364647
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1620364644}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6a784a99dc0cd6f4e9483b2959150c28, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  fromLevel: 2
+  baseCount: 2
+  levelsPerExtra: 4
+  maxCount: 5
+  spawnInterval: 10
+  spawnDistancePerHeight: {x: 6, y: 8}
+  despawnDistance: 600
+  runSpeed: 9
+  preferRangePerHeight: 3.5
+  minRangePerHeight: 1.6
+  fireRangePerHeight: 5.5
+  fireInterval: 6
+  accuracy: 0.65
+  harpoonSpeed: 140
+  anchorTime: 1.6
+  reloadAfterAnchor: 2.5
+  points: 80
+  modernTint: {r: 0.32, g: 0.36, b: 0.26, a: 1}
+  medievalTint: {r: 0.55, g: 0.38, b: 0.22, a: 1}
+--- !u!114 &1620364648
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1620364644}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8af0cddce716db842b0881ae333b2e1c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  ufoPrefab: {fileID: 5903451119183343922, guid: cef6de11ad9c348f1902c4033bed1701, type: 3}
+  fromLevel: 15
+  baseCount: 2
+  levelsPerExtra: 5
+  maxCount: 5
+  spawnInterval: 8
+  sizePerHeight: 0.32
+  orbitSpeed: 35
+  maxSpeedPerHeight: 1.6
+  hoverAfterFire: 1.5
+  chargeTime: 0.9
+  fireInterval: 3.5
+  accuracy: 0.5
+  beamDamage: 8
+  hp: 60
+  points: 1000
 --- !u!1 &1620396902
 GameObject:
   m_ObjectHideFlags: 0
@@ -1060407,7 +1060501,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b4ca7b53e5fff784987c4910751f9a26, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  count: 20
+  count: 0
   heightRatio: {x: 0.95, y: 1.15}
   thicknessRatio: 0.022
   flagSizeRatio: 0.45

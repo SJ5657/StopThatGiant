@@ -13,7 +13,7 @@ public class Flagpoles : MonoBehaviour
     public static bool RightHandBusy => Instance && Instance.phase != Phase.None;
 
     [Header("배치")]
-    [Tooltip("도시에 세우는 게양대 수")] public int count = 20;
+    [Tooltip("도시에 세우는 게양대 수 (0 = 배치하지 않음)")] public int count = 0;
     [Tooltip("게양대 길이 = 거인 키 × 이 범위")] public Vector2 heightRatio = new Vector2(0.95f, 1.15f);
     [Tooltip("게양대 굵기(반지름) = 길이 × 이 비율")] public float thicknessRatio = 0.022f;
     [Tooltip("깃발 가로 길이 = 게양대 길이 × 이 비율 (세로는 가로의 2/3)")] public float flagSizeRatio = 0.45f;

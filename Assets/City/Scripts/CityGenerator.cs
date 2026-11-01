@@ -5,8 +5,39 @@ using UnityEngine;
 // 일부 블록은 이웃 블록과 붙여 일자·ㄴ/ㄱ자 큰 블록으로 만듦 (사이 도로는 없어지고 closedRoads에 기록 → 차량은 그 길로 안 다님).
 // 블록을 부지로 나눈 뒤 일부는 이웃 부지와 합쳐 일자(긴 건물)나 ㄴ/ㄱ자(본체 + 날개) 건물로 세움.
 // 인스펙터 우클릭(⋮) 메뉴 → Generate City / Clear City
-public class CityGenerator : MonoBehaviour
+// style = Medieval이면 같은 도로 격자에 중세 마을을 세움 (CityGenerator.Medieval.cs)
+// generateAtRuntime이면 마을을 씬에 저장하지 않고 플레이할 때마다 새로 세움 (다른 스크립트의 Awake보다 먼저).
+// 편집기에서는 씬을 열면 저장되지 않는 미리보기로 세워 둠.
+[ExecuteAlways]
+[DefaultExecutionOrder(-900)]
+public partial class CityGenerator : MonoBehaviour
 {
+    [Tooltip("켜면 건물을 씬에 저장하지 않고 플레이 시작 때 생성 (씬 파일이 작아짐). 편집기에서는 저장 안 되는 미리보기")]
+    public bool generateAtRuntime;
+
+    void OnEnable()
+    {
+        if (!generateAtRuntime) return;
+        if (Application.isPlaying)
+        {
+            // 편집기 미리보기가 남아 있으면 바로 지우고 새로 세움 (같은 seed → 같은 마을)
+            for (int i = transform.childCount - 1; i >= 0; i--) DestroyImmediate(transform.GetChild(i).gameObject);
+            Generate();
+        }
+        else if (transform.childCount == 0)
+        {
+            Generate();
+            DontSaveChildren();
+        }
+    }
+
+    // 편집기 미리보기: 생성한 오브젝트를 씬 파일에 저장하지 않음
+    public void DontSaveChildren()
+    {
+        foreach (var t in GetComponentsInChildren<Transform>(true))
+            if (t != transform) t.gameObject.hideFlags = HideFlags.DontSaveInEditor;
+    }
+
     [Header("크기")]
     public int blocksX = 16;
     public int blocksZ = 16;
@@ -59,6 +90,12 @@ public class CityGenerator : MonoBehaviour
     [ContextMenu("Generate City")]
     public void Generate()
     {
+        if (style == Style.Medieval)
+        {
+            GenerateMedieval();
+            if (generateAtRuntime && !Application.isPlaying) DontSaveChildren(); // 편집기에서 세운 건 미리보기 (저장 안 함)
+            return;
+        }
         Clear();
         rng = new System.Random(seed);
         EnsureCube();

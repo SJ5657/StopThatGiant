@@ -15,6 +15,7 @@ public class JetAI : MonoBehaviour
 
     public bool IsDead { get; private set; }
     [Tooltip("체력 (새장 포로의 총격용. 거인 몸에 닿으면 체력과 관계없이 폭발)")] public float maxHP = 30f;
+    [Tooltip("격추했을 때 점수 옆에 뜨는 이름")] public string scoreLabel = "FIGHTER JET";
     float hp = -1f;
 
     public void TakeDamage(float dmg)
@@ -85,7 +86,7 @@ public class JetAI : MonoBehaviour
     {
         if (IsDead) return;
         IsDead = true;
-        ScoreManager.Add(ScoreManager.Instance ? ScoreManager.Instance.jetPoints : 1500, "FIGHTER JET");
+        ScoreManager.Add(ScoreManager.Instance ? ScoreManager.Instance.jetPoints : 1500, scoreLabel, transform.position);
         CageSkill.Imprison(CageSkill.Kind.Soldier, CageSkill.JetCrew); // 조종사는 새장으로
         CombatFX.Explosion(transform.position, 26f);
         foreach (var r in GetComponentsInChildren<Renderer>())
@@ -100,9 +101,10 @@ public class JetAI : MonoBehaviour
         transform.position += vel * dt;
         transform.Rotate(fallSpin * dt, Space.Self);
         if (Random.value < 0.3f) CombatFX.Explosion(transform.position, 6f);
-        if (transform.position.y <= 1f)
+        float ground = WildTerrain.Active ? WildTerrain.Height(transform.position.x, transform.position.z) : 0f; // 중세 맵 언덕
+        if (transform.position.y <= ground + 1f)
         {
-            CombatFX.Explosion(new Vector3(transform.position.x, 2f, transform.position.z), 26f);
+            CombatFX.Explosion(new Vector3(transform.position.x, ground + 2f, transform.position.z), 26f);
             Destroy(gameObject);
         }
     }

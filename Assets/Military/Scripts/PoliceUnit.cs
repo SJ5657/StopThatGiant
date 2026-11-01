@@ -172,7 +172,7 @@ public class PoliceUnit : MonoBehaviour
             else { float sc = d - (back ? 40f : 0f); if (sc > best) { best = sc; bi = n.x; bj = n.y; } }
         }
         if (bi != ci || bj != cj) { ti = bi; tj = bj; moving = true; }
-        else if (approach && state == State.Drive) Deploy(gp); // 더 다가갈 교차로가 없으면 여기서 내림
+        else if (approach && state == State.Drive && cur <= reengage * gs) Deploy(gp); // 더 다가갈 교차로가 없으면 여기서 내림 (거인이 도시 밖 멀리 있으면 차 안에서 대기)
     }
 
     IEnumerable<Vector2Int> Neighbors()
@@ -271,7 +271,7 @@ public class PoliceUnit : MonoBehaviour
             else if (state == State.Deploy)
             {
                 if (Flat(p, o.spot) > 0.8f) { target = o.spot; speed = walk; anim01 = 0.5f; }
-                else if (g && !g.IsDead && Time.time >= o.nextShot) Shoot(o, g);
+                else if (g && !g.IsDead && Time.time >= o.nextShot && toG.magnitude <= reengage * gs * 1.2f) Shoot(o, g); // 사거리 밖(화면 밖 먼 곳)에서는 쏘지 않음
             }
 
             Vector3 move = target - p; move.y = 0;
@@ -301,9 +301,10 @@ public class PoliceUnit : MonoBehaviour
         if (hit) g.TakeDamage(damage, false);
     }
 
-    // 총알 궤적: 노란 선이 잠깐 번쩍
+    // 총알 궤적: 노란 선이 잠깐 번쩍 (중세 씬에서는 화살이 날아감)
     public static void Tracer(Vector3 a, Vector3 b)
     {
+        if (GameEra.Medieval) { FlyingArrow.Shoot(a, b); return; }
         if (!WarningZone.material) return;
         var go = new GameObject("Tracer");
         var lr = go.AddComponent<LineRenderer>();
@@ -322,7 +323,7 @@ public class PoliceUnit : MonoBehaviour
         // 새장이 있으면 쓰러지는 대신 새장에 갇힘 (CageSkill)
         if (CageSkill.Imprison(CageSkill.Kind.Police, 1) > 0)
         {
-            ScoreManager.Add(officerPoints, "경찰");
+            ScoreManager.Add(officerPoints, "경찰", o.t.position + Vector3.up);
             Destroy(o.t.gameObject);
             return;
         }
@@ -330,8 +331,8 @@ public class PoliceUnit : MonoBehaviour
         var s = o.t.localScale;
         o.t.localScale = new Vector3(s.x * 1.4f, s.y * 0.12f, s.z * 1.4f);
         BloodSplat.Spawn(o.t.position, officerScale);
-        ScoreManager.Add(officerPoints, "경찰");
-        Destroy(o.t.gameObject, 3f);
+        ScoreManager.Add(officerPoints, "경찰", o.t.position + Vector3.up);
+        SinkAway.Begin(o.t.gameObject, 2f, 0.8f);
     }
 
     // ───────────── 피해 ─────────────
@@ -341,7 +342,7 @@ public class PoliceUnit : MonoBehaviour
         if (IsDead) return;
         IsDead = true;
         moving = false;
-        ScoreManager.Add(carPoints, "POLICE");
+        ScoreManager.Add(carPoints, "POLICE", transform.position + Vector3.up * 3f);
         CombatFX.Explosion(transform.position + Vector3.up * 3f, 12f);
         Vector3 sc = transform.localScale;
         transform.localScale = new Vector3(sc.x * 1.15f, sc.y * 0.3f, sc.z * 1.1f);
@@ -357,7 +358,7 @@ public class PoliceUnit : MonoBehaviour
         }
         CageSkill.Imprison(CageSkill.Kind.Police, aboard); // 차 안에 있던 경찰은 새장으로
         if (GiantCamera.Instance) GiantCamera.Instance.Shake(0.3f);
-        Destroy(gameObject, 6f);
+        SinkAway.Begin(gameObject, 3f); // 잔해는 잠시 뒤 땅속으로 가라앉아 사라짐
     }
 
     // 새장 포로의 총격: 차에 피해

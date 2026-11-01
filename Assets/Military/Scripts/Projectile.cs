@@ -45,7 +45,8 @@ public class Projectile : MonoBehaviour
         }
         // 건물을 뚫고 지나가지 않음: 건물에 맞으면 그 자리에서 폭발
         if (Physics.Linecast(transform.position, next, out RaycastHit hit, BuildingMask, QueryTriggerInteraction.Ignore)) { Explode(hit.point); return; }
-        if (next.y <= 0.3f) { Explode(new Vector3(next.x, 0.5f, next.z)); return; }
+        float ground = WildTerrain.Active ? WildTerrain.Height(next.x, next.z) + 0.3f : 0.3f; // 중세 맵 언덕에도 부딪힘
+        if (next.y <= ground) { Explode(new Vector3(next.x, ground + 0.2f, next.z)); return; }
 
         transform.position = next;
         if (vel.sqrMagnitude > 0.01f) transform.rotation = Quaternion.LookRotation(vel);

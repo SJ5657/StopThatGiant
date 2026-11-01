@@ -17,11 +17,16 @@ public class ScoreManager : MonoBehaviour
 
     void Awake() { Instance = this; }
 
-    public static void Add(int points, string label = null)
+    public static void Add(int points, string label = null) => Gain(points, label, null);
+
+    // 부순 자리(from)를 넘기면 경험치가 구슬이 되어 거인에게 날아가 흡수될 때 들어감 (XpOrbs). 점수는 바로 오름
+    public static void Add(int points, string label, Vector3 from) => Gain(points, label, from);
+
+    static void Gain(int points, string label, Vector3? from)
     {
         if (!Instance) return;
         Instance.Score += points;
-        if (LevelSystem.Instance) LevelSystem.Instance.AddXp(points); // 점수 = 경험치
+        if (!(from.HasValue && XpOrbs.Emit(from.Value, points)) && LevelSystem.Instance) LevelSystem.Instance.AddXp(points); // 점수 = 경험치
         Instance.pulse = 1f;
         if (!string.IsNullOrEmpty(label))
         {
